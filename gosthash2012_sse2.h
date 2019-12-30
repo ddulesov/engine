@@ -12,8 +12,13 @@
 # error "GOST R 34.11-2012: SSE2 not enabled"
 #endif
 
+
 #include <mmintrin.h>
 #include <emmintrin.h>
+
+#ifdef __SSE3__
+#include <pmmintrin.h>
+#endif
 
 #define LO(v) ((unsigned char) (v))
 #define HI(v) ((unsigned char) (((unsigned int) (v)) >> 8))
@@ -29,20 +34,47 @@
 # define _mm_cvtm64_si64(v) (long long) v
 #endif
 
-#define LOAD(P, xmm0, xmm1, xmm2, xmm3) { \
-    const __m128i *__m128p = (const __m128i *) &P[0]; \
-    xmm0 = _mm_load_si128(&__m128p[0]); \
-    xmm1 = _mm_load_si128(&__m128p[1]); \
-    xmm2 = _mm_load_si128(&__m128p[2]); \
-    xmm3 = _mm_load_si128(&__m128p[3]); \
+# ifdef __SSE3__
+#   define UMEM_READ_I128 _mm_lddqu_si128  
+# else 
+#   define UMEM_READ_I128 _mm_loadu_si128
+# endif 
+
+/* load 512bit from unaligned memory  */
+#define ULOAD(P, xmm0, xmm1, xmm2, xmm3) { \
+    const __m128i *__m128p = (const __m128i *) P; \
+    xmm0 = UMEM_READ_I128(&__m128p[0]); \
+    xmm1 = UMEM_READ_I128(&__m128p[1]); \
+    xmm2 = UMEM_READ_I128(&__m128p[2]); \
+    xmm3 = UMEM_READ_I128(&__m128p[3]); \
 }
 
-#define UNLOAD(P, xmm0, xmm1, xmm2, xmm3) { \
+#ifdef UNALIGNED_MEM_ACCESS
+
+# define LOAD   ULOAD
+# define MEM_WRITE_I128  _mm_storeu_si128
+# define MEM_READ_I128   UMEM_READ_I128  
+
+#else
+ 
+# define MEM_WRITE_I128  _mm_store_si128
+# define MEM_READ_I128   _mm_load_si128
+# define LOAD(P, xmm0, xmm1, xmm2, xmm3) { \
+    const __m128i *__m128p = (const __m128i *) P; \
+    xmm0 = MEM_READ_I128(&__m128p[0]); \
+    xmm1 = MEM_READ_I128(&__m128p[1]); \
+    xmm2 = MEM_READ_I128(&__m128p[2]); \
+    xmm3 = MEM_READ_I128(&__m128p[3]); \
+}
+
+#endif
+
+#define STORE(P, xmm0, xmm1, xmm2, xmm3) { \
     __m128i *__m128p = (__m128i *) &P[0]; \
-    _mm_store_si128(&__m128p[0], xmm0); \
-    _mm_store_si128(&__m128p[1], xmm1); \
-    _mm_store_si128(&__m128p[2], xmm2); \
-    _mm_store_si128(&__m128p[3], xmm3); \
+    MEM_WRITE_I128(&__m128p[0], xmm0); \
+    MEM_WRITE_I128(&__m128p[1], xmm1); \
+    MEM_WRITE_I128(&__m128p[2], xmm2); \
+    MEM_WRITE_I128(&__m128p[3], xmm3); \
 }
 
 #define X128R(xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7) { \
@@ -54,10 +86,10 @@
 
 #define X128M(P, xmm0, xmm1, xmm2, xmm3) { \
     const __m128i *__m128p = (const __m128i *) &P[0]; \
-    xmm0 = _mm_xor_si128(xmm0, _mm_load_si128(&__m128p[0])); \
-    xmm1 = _mm_xor_si128(xmm1, _mm_load_si128(&__m128p[1])); \
-    xmm2 = _mm_xor_si128(xmm2, _mm_load_si128(&__m128p[2])); \
-    xmm3 = _mm_xor_si128(xmm3, _mm_load_si128(&__m128p[3])); \
+    xmm0 = _mm_xor_si128(xmm0, MEM_READ_I128(&__m128p[0])); \
+    xmm1 = _mm_xor_si128(xmm1, MEM_READ_I128(&__m128p[1])); \
+    xmm2 = _mm_xor_si128(xmm2, MEM_READ_I128(&__m128p[2])); \
+    xmm3 = _mm_xor_si128(xmm3, MEM_READ_I128(&__m128p[3])); \
 }
 
 #define _mm_xor_64(mm0, mm1) _mm_xor_si64(mm0, _mm_cvtsi64_m64(mm1))
