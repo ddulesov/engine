@@ -10,6 +10,8 @@
 
 #include "e_gost_err.h"
 #include "gost_lcl.h"
+#include "test.h"
+#include "ansi_terminal.h"
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
@@ -22,40 +24,14 @@
 #include <openssl/bn.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <err.h>
 
 /* For X509_NAME_add_entry_by_txt */
 #pragma GCC diagnostic ignored "-Wpointer-sign"
-
-#define T(e) ({ if (!(e)) { \
-		ERR_print_errors_fp(stderr); \
-		OpenSSLDie(__FILE__, __LINE__, #e); \
-	    } \
-        })
-#define TE(e) ({ if (!(e)) { \
-		ERR_print_errors_fp(stderr); \
-		fprintf(stderr, "Error at %s:%d %s\n", __FILE__, __LINE__, #e); \
-		return -1; \
-	    } \
-        })
-
-#define cRED	"\033[1;31m"
-#define cDRED	"\033[0;31m"
-#define cGREEN	"\033[1;32m"
-#define cDGREEN	"\033[0;32m"
-#define cBLUE	"\033[1;34m"
-#define cDBLUE	"\033[0;34m"
-#define cNORM	"\033[m"
-#define TEST_ASSERT(e) {if ((test = (e))) \
-		 printf(cRED "  Test FAILED\n" cNORM); \
-	     else \
-		 printf(cGREEN "  Test passed\n" cNORM);}
 
 struct certkey {
     EVP_PKEY *pkey;

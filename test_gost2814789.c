@@ -8,7 +8,6 @@
  * ====================================================================
  */
 #include <stdio.h>
-
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/conf.h>
@@ -22,6 +21,7 @@
 #define CCGOST_DIR "."
 
 #include "gost89.h"
+#include "test.h"
 
 #define G89_MAX_TC_LEN	(2048)
 #define G89_BLOCK_LEN (8)

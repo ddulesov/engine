@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,24 +8,9 @@
 #include "gost_lcl.h"
 #include "e_gost_err.h"
 #include "gost_grasshopper_cipher.h"
+#include "test.h"
+#include "ansi_terminal.h"
 
-#define T(e) if (!(e)) {\
-	ERR_print_errors_fp(stderr);\
-	OpenSSLDie(__FILE__, __LINE__, #e);\
-    }
-
-static void hexdump(FILE *f, const char *title, const unsigned char *s, int l)
-{
-    int n = 0;
-
-    fprintf(f, "%s", title);
-    for (; n < l; ++n) {
-        if ((n % 16) == 0)
-            fprintf(f, "\n%04x", n);
-        fprintf(f, " %02x", s[n]);
-    }
-    fprintf(f, "\n");
-}
 
 int main(void)
 {

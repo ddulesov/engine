@@ -9,6 +9,8 @@
 
 #include "e_gost_err.h"
 #include "gost_lcl.h"
+#include "test.h"
+#include "ansi_terminal.h"
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
@@ -18,30 +20,6 @@
 #include <openssl/bn.h>
 #include <openssl/safestack.h>
 #include <string.h>
-
-#define T(e) ({ if (!(e)) { \
-		ERR_print_errors_fp(stderr); \
-		OpenSSLDie(__FILE__, __LINE__, #e); \
-	    } \
-        })
-#define TE(e) ({ if (!(e)) { \
-		ERR_print_errors_fp(stderr); \
-		fprintf(stderr, "Error at %s:%d %s\n", __FILE__, __LINE__, #e); \
-		return -1; \
-	    } \
-        })
-
-#define cRED	"\033[1;31m"
-#define cDRED	"\033[0;31m"
-#define cGREEN	"\033[1;32m"
-#define cDGREEN	"\033[0;32m"
-#define cBLUE	"\033[1;34m"
-#define cDBLUE	"\033[0;34m"
-#define cNORM	"\033[m"
-#define TEST_ASSERT(e) {if ((test = (e))) \
-		 printf(cRED "  Test FAILED\n" cNORM); \
-	     else \
-		 printf(cGREEN "  Test passed\n" cNORM);}
 
 struct test_param {
     unsigned int param;		/* NID of EC parameters */
@@ -858,17 +836,6 @@ static struct test_cert {
 };
 #undef D
 
-static void hexdump(const void *ptr, size_t len)
-{
-    const unsigned char *p = ptr;
-    size_t i, j;
-
-    for (i = 0; i < len; i += j) {
-	for (j = 0; j < 16 && i + j < len; j++)
-	    printf("%s %02x", j? "" : "\n", p[i + j]);
-    }
-    printf("\n");
-}
 
 static void print_test_result(int err)
 {
@@ -1060,7 +1027,7 @@ static int test_param(struct test_param *t)
 	T(mdtype = EVP_get_digestbynid(hash_nid));
 	T(EVP_VerifyInit(md_ctx, mdtype));
 	/* Feed byte-by-byte. */
-	int i;
+	unsigned int i;
 	for (i = 0; i < t->data_len; i++)
 	    T(EVP_VerifyUpdate(md_ctx, &t->data[i], 1));
 	err = EVP_VerifyFinal(md_ctx, sig, siglen, pkey);
@@ -1092,7 +1059,7 @@ static int test_param(struct test_param *t)
 int main(int argc, char **argv)
 {
     int ret = 0;
-
+    setupConsole();
     setenv("OPENSSL_ENGINES", ENGINE_DIR, 0);
     OPENSSL_add_all_algorithms_conf();
     ERR_load_crypto_strings();
@@ -1111,6 +1078,6 @@ int main(int argc, char **argv)
 
     ENGINE_finish(eng);
     ENGINE_free(eng);
-
+    restoreConsole();
     return ret;
 }
