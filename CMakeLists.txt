@@ -192,8 +192,11 @@ set_tests_properties(engine PROPERTIES ENVIRONMENT
 	"OPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR};OPENSSL_ENGINES=${OUTPUT_DIRECTORY};OPENSSL_CONF=${CMAKE_SOURCE_DIR}/test/empty.cnf")
 endif()
 
-add_executable(sign benchmark/sign.c)
-target_link_libraries(sign gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${CLOCK_GETTIME_LIB})
+add_executable(bench_digest benchmark/digest.c ansi_terminal.c)
+target_link_libraries(bench_digest gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${CLOCK_GETTIME_LIB})
+
+add_executable(bench_sign benchmark/sign.c ansi_terminal.c)
+target_link_libraries(bench_sign gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${CLOCK_GETTIME_LIB})
 
 # All that may need to load just built engine will have path to it defined.
 set(BINARY_TESTS_TARGETS
