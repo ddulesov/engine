@@ -25,7 +25,7 @@
 #define ossl3_const const
 #endif
 
-/* -----init, cleanup, copy - uniform for all algs  --------------*/
+/* -----init, cleanup, copy - uniform for all algs790  --------------*/
 /* Allocates new gost_pmeth_data structure and assigns it as data */
 static int pkey_gost_init(EVP_PKEY_CTX *ctx)
 {
@@ -659,7 +659,7 @@ static int pkey_gost_mac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
                 GOSTerr(GOST_F_PKEY_GOST_MAC_CTRL, GOST_R_INVALID_MAC_SIZE);
                 return 0;
             }
-            data->mac_size = p1;
+            data->mac_size = (short int)p1;
             return 1;
         }
     }
@@ -787,12 +787,12 @@ static int pkey_gost_omac_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2, si
         }
     case EVP_PKEY_CTRL_MAC_LEN:
         {
-            if (p1 < 1 || p1 > max_size) {
+            if ((size_t)p1==0 || (size_t)p1 > max_size) {
 
                 GOSTerr(GOST_F_PKEY_GOST_OMAC_CTRL, GOST_R_INVALID_MAC_SIZE);
                 return 0;
             }
-            data->mac_size = p1;
+            data->mac_size = (short int)p1;
             return 1;
         }
     }
