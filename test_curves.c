@@ -44,15 +44,6 @@ static struct test_curve test_curves[] = {
     0,
 };
 
-static struct test_curve *get_test_curve(int nid)
-{
-    int i;
-
-    for (i = 0; test_curves[i].nid; i++)
-	if (test_curves[i].nid == nid)
-	    return &test_curves[i];
-    return NULL;
-}
 
 static void print_bn(const char *name, const BIGNUM *n)
 {

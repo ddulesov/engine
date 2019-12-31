@@ -1,6 +1,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+
+
 #define T(e) do{    if (!(e)) {\
 	  ERR_print_errors_fp(stderr);\
 	  OpenSSLDie(__FILE__, __LINE__, #e); }\
@@ -17,9 +19,16 @@
            printf(cGREEN "  Test passed\n" cNORM)\
              
 
+#ifdef __GNUC__
+#define _UNUSED_ __attribute__ ((unused))
+#else
+#define _UNUSED_
+#endif
 
 
-static void hexdump(FILE *f, const char *title, const unsigned char *s, int l)
+
+
+_UNUSED_ static void hexdump(FILE *f, const char *title, const unsigned char *s, int l)
 {
     int n = 0;
 
@@ -32,7 +41,7 @@ static void hexdump(FILE *f, const char *title, const unsigned char *s, int l)
     fprintf(f, "\n");
 }
 
-static void hexdump_inline(const void *ptr, size_t len)
+_UNUSED_ static void hexdump_inline(const void *ptr, size_t len) 
 {
     const unsigned char *p = ptr;
     size_t i, j;
