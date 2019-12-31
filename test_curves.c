@@ -41,7 +41,7 @@ static struct test_curve test_curves[] = {
     { NID_id_tc26_gost_3410_2012_256_paramSetB, "id-tc26-gost-3410-2012-256-paramSetB", },
     { NID_id_tc26_gost_3410_2012_256_paramSetC, "id-tc26-gost-3410-2012-256-paramSetC", },
     { NID_id_tc26_gost_3410_2012_256_paramSetD, "id-tc26-gost-3410-2012-256-paramSetD", },
-    0,
+    {0},
 };
 
 

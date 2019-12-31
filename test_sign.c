@@ -41,7 +41,7 @@ static struct test_sign test_signs[] = {
     D(NID_id_tc26_gost_3410_2012_512_paramSetA,   512, "A"),
     D(NID_id_tc26_gost_3410_2012_512_paramSetB,   512, "B"),
     D(NID_id_tc26_gost_3410_2012_512_paramSetC,   512, "C"),
-    0
+    {0}
 };
 #undef D
 
