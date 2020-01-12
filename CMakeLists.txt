@@ -63,7 +63,7 @@ if(ASAN)
  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -g3 -fno-omit-frame-pointer")
 endif()
 
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 CHECK_FUNCTION_EXISTS(clock_gettime HAVE_CLOCK_GETTIME_C)
 CHECK_LIBRARY_EXISTS(rt clock_gettime "" HAVE_CLOCK_GETTIME_RT)
 
@@ -277,17 +277,27 @@ endif()
 #utilities
 set(GOST_SUM_SOURCE_FILES
         gostsum.c
-    )
+)
 
 add_executable(gostsum ${GOST_SUM_SOURCE_FILES})
 target_link_libraries(gostsum gost_core)
 
 set(GOST_12_SUM_SOURCE_FILES
         gost12sum.c
+		ansi_terminal.c
+		gosthash2012.c
     )
-
 add_executable(gost12sum ${GOST_12_SUM_SOURCE_FILES})
-target_link_libraries(gost12sum gost_core)
+
+IF(NOT MSVC)
+set(GOST_1_SUM_SOURCE_FILES
+        tools/gostsum1.c
+		ansi_terminal.c
+		gosthash2012.c
+    )
+add_executable(gost1sum ${GOST_1_SUM_SOURCE_FILES})
+target_link_libraries(gost1sum pthread)
+ENDIF()
 
 #benchmarks
 add_executable(bench_digest benchmark/digest.c ansi_terminal.c)
