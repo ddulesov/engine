@@ -9,6 +9,8 @@
 
 #include "e_gost_err.h"
 #include "gost_lcl.h"
+#include "test.h"
+#include "ansi_terminal.h"
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
@@ -20,29 +22,6 @@
 # include <sys/sysmips.h>
 #endif
 
-#define T(e) ({ if (!(e)) { \
-		ERR_print_errors_fp(stderr); \
-		OpenSSLDie(__FILE__, __LINE__, #e); \
-	    } \
-        })
-#define TE(e) ({ if (!(e)) { \
-		ERR_print_errors_fp(stderr); \
-		fprintf(stderr, "Error at %s:%d %s\n", __FILE__, __LINE__, #e); \
-		return -1; \
-	    } \
-        })
-
-#define cRED	"\033[1;31m"
-#define cDRED	"\033[0;31m"
-#define cGREEN	"\033[1;32m"
-#define cDGREEN	"\033[0;32m"
-#define cBLUE	"\033[1;34m"
-#define cDBLUE	"\033[0;34m"
-#define cNORM	"\033[m"
-#define TEST_ASSERT(e) {if ((test = (e))) \
-		 printf(cRED "  Test FAILED\n" cNORM); \
-	     else \
-		 printf(cGREEN "  Test passed\n" cNORM);}
 
 struct hash_testvec {
 	int nid;
@@ -160,20 +139,17 @@ static int do_digest(int hash_nid, const char *plaintext, unsigned int psize,
     const char *etalon)
 {
 	unsigned int mdlen = 0;
+	unsigned int len;
+	unsigned char md[512 / 8];
+        const EVP_MD *mdtype;
+
 	if (hash_nid == NID_id_GostR3411_2012_256)
 		mdlen = 256 / 8;
 	else if (hash_nid == NID_id_GostR3411_2012_512)
 		mdlen = 512 / 8;
-	const EVP_MD *mdtype;
+	
 	T(mdtype = EVP_get_digestbynid(hash_nid));
-	EVP_MD_CTX *ctx;
-	T(ctx = EVP_MD_CTX_new());
-	T(EVP_DigestInit(ctx, mdtype));
-	T(EVP_DigestUpdate(ctx, plaintext, psize));
-	unsigned int len;
-	unsigned char md[512 / 8];
-	T(EVP_DigestFinal(ctx, md, &len));
-	EVP_MD_CTX_free(ctx);
+	EVP_Digest(plaintext, psize, md, &len, mdtype, NULL);
 	if (len != mdlen) {
 		printf(cRED "digest output len mismatch %u != %u (expected)\n" cNORM,
 		    len, mdlen);
@@ -181,12 +157,14 @@ static int do_digest(int hash_nid, const char *plaintext, unsigned int psize,
 	}
 	if (memcmp(md, etalon, mdlen) != 0) {
 		printf(cRED "digest mismatch\n" cNORM);
+                hexdump(stdout, "actial", md, mdlen ); 
+		hexdump(stdout, "expected", (const unsigned char*)etalon, mdlen );
 		return 1;
 	}
 	
-	/* small chunk test 63+64+rest*/
+	/* small chunk test. split data on 63+64+rest*/
 	if( psize>128 ){
-		
+		EVP_MD_CTX *ctx;		
 		T(ctx = EVP_MD_CTX_new());
 		T(EVP_DigestInit(ctx, mdtype));
 		T(EVP_DigestUpdate(ctx, plaintext, 63));
@@ -225,7 +203,7 @@ static int do_test(const struct hash_testvec *tv)
 	fflush(stdout);
 	ret |= do_digest(tv->nid, tv->plaintext, tv->psize, tv->digest);
 
-	/* Text alignment problems. */
+	/* Test alignment problems. */
 	int shifts = 32;
 	int i;
 	char *buf;
@@ -246,7 +224,7 @@ static int do_test(const struct hash_testvec *tv)
 int main(int argc, char **argv)
 {
     int ret = 0;
-
+    setupConsole();
 #if MIPSEL
     /* Trigger SIGBUS for unaligned access. */
     sysmips(MIPS_FIXADE, 0);
@@ -270,5 +248,6 @@ int main(int argc, char **argv)
 	printf(cDRED "= Some tests FAILED!\n" cNORM);
     else
 	printf(cDGREEN "= All tests passed!\n" cNORM);
+    restoreConsole();
     return ret;
 }

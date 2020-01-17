@@ -11,28 +11,26 @@
 #include "gost_grasshopper_core.h"
 #include "e_gost_err.h"
 #include "gost_lcl.h"
+#include "test.h"
+#include "ansi_terminal.h"
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #include <openssl/asn1.h>
 #include <string.h>
+#include <assert.h>
+#if defined(_MSC_VER)
+  /* MSVC doesn't fully support C99 VLA. The simples workaroud  is using 
+     big static array instead.
+  */
+# define MAX_BUF_SIZE   144 
+# define DECLARE_BUF(SZ)   unsigned char c[MAX_BUF_SIZE];\
+                           assert(SZ<=MAX_BUF_SIZE);
+#else
+# define DECLARE_BUF(SZ)   unsigned char c[SZ];
+#endif
 
-#define T(e) if (!(e)) {\
-	ERR_print_errors_fp(stderr);\
-	OpenSSLDie(__FILE__, __LINE__, #e);\
-    }
 
-#define cRED	"\033[1;31m"
-#define cDRED	"\033[0;31m"
-#define cGREEN	"\033[1;32m"
-#define cDGREEN	"\033[0;32m"
-#define cBLUE	"\033[1;34m"
-#define cDBLUE	"\033[0;34m"
-#define cNORM	"\033[m"
-#define TEST_ASSERT(e) {if ((test = (e))) \
-		 printf(cRED "Test FAILED\n" cNORM); \
-	     else \
-		 printf(cGREEN "Test passed\n" cNORM);}
 
 /* Test key from both GOST R 34.12-2015 and GOST R 34.13-2015. */
 static const unsigned char K[32] = {
@@ -159,7 +157,7 @@ static const unsigned char MAC_omac_acpkm2[] = {
 
 struct testcase {
     const char *name;
-    const EVP_CIPHER *(*type)(void);
+    const EVP_CIPHER *(*type)();
     int stream;
     const unsigned char *plaintext;
     const unsigned char *expected;
@@ -178,20 +176,9 @@ static struct testcase testcases[] = {
     { "ofb", cipher_gost_grasshopper_ofb, 1, P,  E_ofb,  sizeof(P),  iv_128bit,  sizeof(iv_128bit), 0 },
     { "cbc", cipher_gost_grasshopper_cbc, 0, P,  E_cbc,  sizeof(P),  iv_128bit,  sizeof(iv_128bit), 0 },
     { "cfb", cipher_gost_grasshopper_cfb, 0, P,  E_cfb,  sizeof(P),  iv_128bit,  sizeof(iv_128bit), 0 },
-    NULL
+    {0}
 };
 
-static void hexdump(const void *ptr, size_t len)
-{
-    const unsigned char *p = ptr;
-    size_t i, j;
-
-    for (i = 0; i < len; i += j) {
-	for (j = 0; j < 16 && i + j < len; j++)
-	    printf("%s%02x", j? "" : " ", p[i + j]);
-    }
-    printf("\n");
-}
 
 static int test_block(const EVP_CIPHER *type, const char *name,
     const unsigned char *pt, const unsigned char *exp, size_t size,
@@ -200,9 +187,10 @@ static int test_block(const EVP_CIPHER *type, const char *name,
 {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     const char *standard = acpkm? "R 23565.1.017-2018" : "GOST R 34.13-2015";
-    unsigned char c[size];
     int outlen, tmplen;
     int ret = 0, test;
+    
+    DECLARE_BUF(size);
 
     OPENSSL_assert(ctx);
     printf("Encryption test from %s [%s] %s\n", standard, name,
@@ -214,14 +202,14 @@ static int test_block(const EVP_CIPHER *type, const char *name,
     if (inplace)
 	memcpy(c, pt, size);
     else
-	memset(c, 0, sizeof(c));
+	memset(c, 0, size);
     if (acpkm)
 	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     T(EVP_CipherUpdate(ctx, c, &outlen, inplace? c : pt, size));
     T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
     EVP_CIPHER_CTX_cleanup(ctx);
     printf("  c[%d] = ", outlen);
-    hexdump(c, outlen);
+    hexdump_inline(c, outlen);
 
     TEST_ASSERT(outlen != size || memcmp(c, exp, size));
     ret |= test;
@@ -237,7 +225,7 @@ static int test_block(const EVP_CIPHER *type, const char *name,
     if (inplace)
 	memcpy(c, pt, size);
     else
-	memset(c, 0, sizeof(c));
+	memset(c, 0, size);
     if (acpkm)
 	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     for (z = 0; z < blocks; z++) {
@@ -250,7 +238,7 @@ static int test_block(const EVP_CIPHER *type, const char *name,
     T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
     EVP_CIPHER_CTX_cleanup(ctx);
     printf("  c[%d] = ", outlen);
-    hexdump(c, outlen);
+    hexdump_inline(c, outlen);
 
     TEST_ASSERT(outlen != size || memcmp(c, exp, size));
     ret |= test;
@@ -264,7 +252,7 @@ static int test_block(const EVP_CIPHER *type, const char *name,
     if (inplace)
 	memcpy(c, exp, size);
     else
-	memset(c, 0, sizeof(c));
+	memset(c, 0, size);
     if (acpkm)
 	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     T(EVP_CipherUpdate(ctx, c, &outlen, inplace ? c : exp, size));
@@ -272,7 +260,7 @@ static int test_block(const EVP_CIPHER *type, const char *name,
     EVP_CIPHER_CTX_cleanup(ctx);
     EVP_CIPHER_CTX_free(ctx);
     printf("  d[%d] = ", outlen);
-    hexdump(c, outlen);
+    hexdump_inline(c, outlen);
 
     TEST_ASSERT(outlen != size || memcmp(c, pt, size));
     ret |= test;
@@ -288,12 +276,12 @@ static int test_stream(const EVP_CIPHER *type, const char *name,
     const char *standard = acpkm? "R 23565.1.017-2018" : "GOST R 34.13-2015";
     int ret = 0, test;
     int z;
+    DECLARE_BUF(size);
 
     OPENSSL_assert(ctx);
     /* Cycle through all lengths from 1 upto maximum size */
     printf("Stream encryption test from %s [%s] \n", standard, name);
     for (z = 1; z <= size; z++) {
-	unsigned char c[size];
 	int outlen, tmplen;
 	int sz = 0;
 	int i;
@@ -301,7 +289,7 @@ static int test_stream(const EVP_CIPHER *type, const char *name,
 	EVP_CIPHER_CTX_init(ctx);
 	T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, 1));
 	T(EVP_CIPHER_CTX_set_padding(ctx, 0));
-	memset(c, 0xff, sizeof(c));
+	memset(c, 0xff, size);
 	if (acpkm)
 	    T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
 	for (i = 0; i < size; i += z) {
@@ -354,7 +342,7 @@ static int test_mac(const char *name, const char *from,
     }
     EVP_MD_CTX_free(ctx);
     printf("  MAC[%u] = ", md_len);
-    hexdump(md_value, mac_size);
+    hexdump_inline(md_value, mac_size);
 
     TEST_ASSERT(md_len != mac_size ||
 	memcmp(mac, md_value, mac_size));
@@ -367,6 +355,7 @@ int main(int argc, char **argv)
     int ret = 0;
     const struct testcase *t;
 
+    setupConsole();
     setenv("OPENSSL_ENGINES", ENGINE_DIR, 0);
     OPENSSL_add_all_algorithms_conf();
     ERR_load_crypto_strings();
@@ -409,5 +398,6 @@ int main(int argc, char **argv)
 	printf(cDRED "= Some tests FAILED!\n" cNORM);
     else
 	printf(cDGREEN "= All tests passed!\n" cNORM);
+    restoreConsole();
     return ret;
 }

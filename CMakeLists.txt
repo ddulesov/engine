@@ -10,27 +10,65 @@ enable_testing()
 find_package(OpenSSL 1.1.1 REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-if (CMAKE_C_COMPILER_ID MATCHES "Clang")
- add_compile_options(-O2 -Werror -Wall -Wno-unused-parameter -Wno-unused-function -Wno-missing-braces -ggdb -Qunused-arguments)
-elseif(CMAKE_C_COMPILER_ID MATCHES "GNU")
- add_compile_options(-O2 -Werror -Wall -Wno-unused-parameter -Wno-unused-function -Wno-missing-braces -ggdb)
-elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+if(NOT CMAKE_BUILD_TYPE)
+ if (ASAN)
+  set(CMAKE_BUILD_TYPE Debug)
+ else()
+  set(CMAKE_BUILD_TYPE Release)
+ endif()
+endif()
+
+set(CMAKE_C_FLAGS_RELEASE "-O2")
+
+IF(CMAKE_C_COMPILER_ID MATCHES "Clang")
+ set(GCC_COMPATIBLE_COMPILER 1)
+ set(CMAKE_C_FLAGS_DEBUG "-ggdb")
+ add_compile_options(-Werror -Wall -Qunused-arguments)
+ELSEIF(CMAKE_C_COMPILER_ID MATCHES "GNU|ICC")
+ set(GCC_COMPATIBLE_COMPILER 1)
+ set(CMAKE_C_FLAGS_DEBUG "-ggdb")
+ add_compile_options(-Werror -Wall)
+ELSEIF(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+ set(MSVC_COMPATIBLE_COMPILER 1)
  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
  add_definitions(-D_CRT_DEPRECATED_NO_WARNINGS)
  add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
- add_compile_options(/MP /WX /W4 /wd4100 /wd4267 /wd4206 /wd4706 /wd4244 /wd4115)
+ add_compile_options(/MP /WX /W4 /wd4100 /wd4267 /wd4706  /TC)
+ENDIF()
+
+cmake_host_system_information(RESULT  CPU_HAS_SSE2 QUERY HAS_SSE2)
+
+IF(CPU_HAS_SSE2 AND NOT NO_SIMD)
+ message("build SSE2 optimized library. Add  NO_SIMD parameter to turn SSE off")
+ add_definitions(-DENABLE_SIMD)
+ IF(GCC_COMPATIBLE_COMPILER)
+  #ensure compiler turn SIMD flags and intrinsics on
+  add_compile_options(-march=native)
+ ELSEIF(MSVC_COMPATIBLE_COMPILER)
+  message("to turn on SSE2/AVX optimization on Windows uncomment appropriate option line!")
+  #MSVC require further survey of system capabilities  (SSE4.1,AVX)
+  #but current version of CMAKE (3.16) lack of such feature
+  #uncomment one of the next line to build GOST Engine boosted by SSE/AVX 
+  
+  #add_compile_options(/arch:AVX512)
+  add_compile_options(/arch:AVX2)
+  #add_compile_options(/arch:AVX)
+  #add_compile_options(/arch:SSE2)
+  
+ ENDIF()
+ENDIF()
+
+if(ASAN)
+ message(STATUS "address sanitizer enabled")
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -g3 -fno-omit-frame-pointer")
 endif()
 
-if (ASAN)
-  message(STATUS "address sanitizer enabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -g3 -fno-omit-frame-pointer")
-endif()
-
-set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_STANDARD 11)
 CHECK_FUNCTION_EXISTS(clock_gettime HAVE_CLOCK_GETTIME_C)
 CHECK_LIBRARY_EXISTS(rt clock_gettime "" HAVE_CLOCK_GETTIME_RT)
+
 if(HAVE_CLOCK_GETTIME_RT AND NOT HAVE_CLOCK_GETTIME_C)
-  set(CLOCK_GETTIME_LIB rt)
+ set(CLOCK_GETTIME_LIB rt)
 endif()
 
 include (TestBigEndian)
@@ -42,14 +80,16 @@ else()
  add_definitions(-DL_ENDIAN)
 endif()
 
+if(FORCE_UNALIGNED_MEM_ACCESS)
+ add_definitions(-DFORCE_UNALIGNED_MEM_ACCESS)
+endif()
+
 set(BIN_DIRECTORY bin)
 
 # Same soversion as OpenSSL
 set(GOST_SOVERSION "${OPENSSL_VERSION_MAJOR}.${OPENSSL_VERSION_MINOR}")
 
 set(OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${BIN_DIRECTORY})
-
-#set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
 
@@ -120,6 +160,7 @@ set (GOST_OMAC_SOURCE_FILES
         )
 
 set(GOST_LIB_SOURCE_FILES
+		${GOST_CORE_SOURCE_FILES}
         ${GOST_89_SOURCE_FILES}
         ${GOST_HASH_SOURCE_FILES}
         ${GOST_HASH_2012_SOURCE_FILES}
@@ -138,42 +179,48 @@ set(GOST_ENGINE_SOURCE_FILES
         gost_omac_acpkm.c
         )
 
-add_executable(test_digest test_digest.c)
+#tests
+add_executable(test_digest test_digest.c ansi_terminal.c)
 target_link_libraries(test_digest gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME digest
 	COMMAND test_digest)
 
-add_executable(test_curves test_curves.c)
+add_executable(test_curves test_curves.c ansi_terminal.c)
 target_link_libraries(test_curves gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME curves
 	COMMAND test_curves)
 
-add_executable(test_params test_params.c)
+add_executable(test_params test_params.c ansi_terminal.c)
 target_link_libraries(test_params gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME parameters
 	COMMAND test_params)
 
-add_executable(test_sign test_sign.c)
+add_executable(test_sign test_sign.c ansi_terminal.c)
 target_link_libraries(test_sign gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME sign/verify
 	COMMAND test_sign)
 
-add_executable(test_tls test_tls.c)
+IF(NOT MSVC)
+
+add_executable(test_tls test_tls.c ansi_terminal.c)
 target_link_libraries(test_tls gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
 add_test(NAME TLS
 	COMMAND test_tls)
+ELSE()
+message(WARNING  "test_tls build is skipped. Windows platform doesn't support some POSIX API ")
+ENDIF()
 
-add_executable(test_context test_context.c)
+add_executable(test_context test_context.c ansi_terminal.c)
 target_link_libraries(test_context gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME context
 	COMMAND test_context)
 
-add_executable(test_grasshopper test_grasshopper.c)
+add_executable(test_grasshopper test_grasshopper.c ansi_terminal.c)
 target_link_libraries(test_grasshopper gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME grasshopper
 	COMMAND test_grasshopper)
 
-add_executable(test_keyexpimp test_keyexpimp.c)
+add_executable(test_keyexpimp test_keyexpimp.c ansi_terminal.c)
 #target_compile_definitions(test_keyexpimp PUBLIC -DOPENSSL_LOAD_CONF)
 target_link_libraries(test_keyexpimp gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME keyexpimp
@@ -192,8 +239,10 @@ set_tests_properties(engine PROPERTIES ENVIRONMENT
 	"OPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR};OPENSSL_ENGINES=${OUTPUT_DIRECTORY};OPENSSL_CONF=${CMAKE_SOURCE_DIR}/test/empty.cnf")
 endif()
 
-add_executable(sign benchmark/sign.c)
-target_link_libraries(sign gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${CLOCK_GETTIME_LIB})
+add_executable(test_tlstree test_tlstree.c)
+target_link_libraries(test_tlstree PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
+add_test(NAME test_tlstree
+	COMMAND test_tlstree)
 
 # All that may need to load just built engine will have path to it defined.
 set(BINARY_TESTS_TARGETS
@@ -205,10 +254,15 @@ set(BINARY_TESTS_TARGETS
         test_grasshopper
         test_keyexpimp
         test_gost89
-	test_tls
-        )
+        
+    )
+IF(NOT MSVC)
+list(APPEND BINARY_TESTS_TARGETS test_tls)
+ENDIF()
+
 set_property(TARGET ${BINARY_TESTS_TARGETS} APPEND PROPERTY COMPILE_DEFINITIONS ENGINE_DIR="${OUTPUT_DIRECTORY}")
 
+#core library
 add_library(gost_core STATIC ${GOST_LIB_SOURCE_FILES})
 set_target_properties(gost_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -216,37 +270,58 @@ add_library(gost_engine SHARED ${GOST_ENGINE_SOURCE_FILES})
 set_target_properties(gost_engine PROPERTIES PREFIX "" OUTPUT_NAME "gost")
 set_target_properties(gost_engine PROPERTIES VERSION ${GOST_SOVERSION} SOVERSION ${GOST_SOVERSION})
 target_link_libraries(gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
+if(WIN32)
+  target_link_libraries(gost_engine wsock32 ws2_32)
+endif()
 
+#utilities
 set(GOST_SUM_SOURCE_FILES
         gostsum.c
-        )
+)
 
 add_executable(gostsum ${GOST_SUM_SOURCE_FILES})
 target_link_libraries(gostsum gost_core)
 
 set(GOST_12_SUM_SOURCE_FILES
         gost12sum.c
-        )
-
+		ansi_terminal.c
+		gosthash2012.c
+    )
 add_executable(gost12sum ${GOST_12_SUM_SOURCE_FILES})
-target_link_libraries(gost12sum gost_core)
+
+IF(NOT MSVC)
+set(GOST_1_SUM_SOURCE_FILES
+        tools/gostsum1.c
+		ansi_terminal.c
+		gosthash2012.c
+    )
+add_executable(gost1sum ${GOST_1_SUM_SOURCE_FILES})
+target_link_libraries(gost1sum pthread)
+ENDIF()
+
+#benchmarks
+add_executable(bench_digest benchmark/digest.c ansi_terminal.c)
+target_link_libraries(bench_digest gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${CLOCK_GETTIME_LIB})
+
+add_executable(bench_sign benchmark/sign.c ansi_terminal.c)
+target_link_libraries(bench_sign gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${CLOCK_GETTIME_LIB})
+
+IF(NOT MSVC)
 
 set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_target(tags
     COMMAND ctags -R . ${OPENSSL_ROOT_DIR}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-
-add_executable(test_tlstree test_tlstree.c)
-target_link_libraries(test_tlstree PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
-
-# install
+	
 set(OPENSSL_MAN_INSTALL_DIR ${CMAKE_INSTALL_MANDIR}/man1)
 
 install(TARGETS gost_engine gostsum gost12sum EXPORT GostEngineConfig
         LIBRARY  DESTINATION ${OPENSSL_ENGINES_DIR}
         RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES gostsum.1 gost12sum.1 DESTINATION ${OPENSSL_MAN_INSTALL_DIR})
-if (MSVC)
+
+ELSE()
  install(FILES $<TARGET_PDB_FILE:gost_engine> DESTINATION ${OPENSSL_ENGINES_DIR} OPTIONAL)
  install(FILES $<TARGET_PDB_FILE:gostsum> $<TARGET_PDB_FILE:gost12sum> DESTINATION ${CMAKE_INSTALL_BINDIR} OPTIONAL)
-endif()
+ENDIF()
+

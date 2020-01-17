@@ -11,6 +11,16 @@
 #include "gosthash2012.h"
 #include <assert.h>
 
+#ifdef __x86_64__
+
+# include <immintrin.h>
+# ifdef __clang__
+# elif __GNUC__
+#  include <x86intrin.h>
+# else
+#  include <intrin.h>
+# endif
+#endif
 
 #define BSWAP64(x) \
     (((x & 0xFF00000000000000ULL) >> 56) | \
@@ -36,37 +46,26 @@ void init_gost2012_hash_ctx(gost2012_hash_ctx * CTX,
 }
 
 static INLINE void pad(gost2012_hash_ctx * CTX)
-{
-    
+{    
     assert( CTX->bufsize < 64 );
-    /* this is unreachable condition. It can be removed without any consequences  
-    if (CTX->bufsize >= sizeof(CTX->buffer) )
-        return;
-    */
     
-
-    memset(&(CTX->buffer[CTX->bufsize]), 0x00, sizeof(CTX->buffer) - CTX->bufsize  );
-    CTX->buffer[CTX->bufsize] = 0x01;
+    memset(&(CTX->buffer.B[CTX->bufsize]), 0x00, sizeof(CTX->buffer) - CTX->bufsize  );
+    CTX->buffer.B[CTX->bufsize] = 0x01;
 }
 
-static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * RESTRICT y)
+static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * UNALIGNED RESTRICT y)
 {
-#ifndef __GOST3411_BIG_ENDIAN__
-    unsigned long CF=0;
-    unsigned long long tmp;
+    
+#ifdef __x86_64__
+    unsigned char CF=0;
     unsigned int i;
-
+    
     for (i = 0; i < 8; i++)
     {
-        tmp = x->QWORD[i] + y->QWORD[i] + CF;
-	
-        if (tmp != x->QWORD[i])
-            CF = (tmp < x->QWORD[i]);
-        
-        x->QWORD[i] = tmp;        
+        CF = _addcarry_u64(CF, x->QWORD[i] , y->QWORD[i], &(x->QWORD[i]) );     
     }
-#else
-
+    
+#elif __GOST3411_BIG_ENDIAN__
     const unsigned char *yp;
     unsigned char *xp;
     unsigned int i;
@@ -81,11 +80,25 @@ static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * 
         buf = xp[i] + yp[i] + (buf >> 8);
         xp[i] = (unsigned char)buf & 0xFF;
     }
+#else
+    unsigned long CF=0;
+    unsigned long long tmp;
+    unsigned int i;
+
+    for (i = 0; i < 8; i++)
+    {
+        tmp = x->QWORD[i] + y->QWORD[i] + CF;
+    
+        if (tmp != x->QWORD[i])
+            CF = (tmp < x->QWORD[i]);
+        
+        x->QWORD[i] = tmp;        
+    }
 #endif
 }
 
 static void g(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
-              const union uint512_u * RESTRICT m)
+              const union uint512_u * UNALIGNED RESTRICT m)
 {
 #ifdef __GOST3411_HAS_SSE2__
     __m128i xmm0, xmm2, xmm4, xmm6; /* XMMR0-quadruple */
@@ -94,8 +107,8 @@ static void g(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
 
     LOAD(N, xmm0, xmm2, xmm4, xmm6);
     XLPS128M(h, xmm0, xmm2, xmm4, xmm6);
+    ULOAD(m, xmm1, xmm3, xmm5, xmm7);
 
-    LOAD(m, xmm1, xmm3, xmm5, xmm7);
     XLPS128R(xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
 
     for (i = 0; i < 11; i++)
@@ -105,12 +118,14 @@ static void g(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
     X128R(xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
 
     X128M(h, xmm0, xmm2, xmm4, xmm6);
-    X128M(m, xmm0, xmm2, xmm4, xmm6);
+    ULOAD(m, xmm1, xmm3, xmm5, xmm7);
+    X128R(xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
 
-    UNLOAD(h, xmm0, xmm2, xmm4, xmm6);
-
-    /* Restore the Floating-point status on the CPU */
+    STORE(h, xmm0, xmm2, xmm4, xmm6);
+#if 0
+    /* Restore the Floating-point status on the CPU. Require only for MMX version */
     _mm_empty();
+#endif    
 #else
     union uint512_u Ki, data;
     unsigned int i;
@@ -129,38 +144,36 @@ static void g(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
     /* E() done */
 
     X((&data), h, (&data));
-    X((&data), ((const union uint512_u *)&m[0]), h);
+    X((&data), m, h);
 #endif
 }
 
-static INLINE void stage2(gost2012_hash_ctx * CTX)
+static INLINE void stage2(gost2012_hash_ctx * CTX, const union uint512_u * UNALIGNED data)
 {
-    g(&(CTX->h), &(CTX->N), (const union uint512_u *)&(CTX->buffer[0]) );
+    g(&(CTX->h), &(CTX->N), data );
 
     add512(&(CTX->N), &buffer512);
-    add512(&(CTX->Sigma), (const union uint512_u *)&(CTX->buffer[0]) );
+    add512(&(CTX->Sigma), data );
 }
 
 static INLINE void stage3(gost2012_hash_ctx * CTX)
 {
-    union uint512_u *buf= (union uint512_u *)&CTX->buffer[0];
-
     pad(CTX);
 
-    g(&(CTX->h), &(CTX->N), (const union uint512_u *)buf );
+    g(&(CTX->h), &(CTX->N), &(CTX->buffer) );
 
-    add512(&(CTX->Sigma), (const union uint512_u *)buf);
+    add512(&(CTX->Sigma), &(CTX->buffer));
 
-    memset(buf, 0x00, sizeof(uint512_u) );	
+    memset(&(CTX->buffer.B[0]), 0x00, sizeof(uint512_u) );  
 #ifndef __GOST3411_BIG_ENDIAN__
-    buf->QWORD[0] = CTX->bufsize << 3;
+    CTX->buffer.QWORD[0] = CTX->bufsize << 3;
 #else
-    buf->QWORD[0] = BSWAP64(CTX->bufsize << 3);
+    CTX->buffer.QWORD[0] = BSWAP64(CTX->bufsize << 3);
 #endif
        
-    add512(&(CTX->N), buf);
-    g(&(CTX->h), &buffer0, (const union uint512_u *)&(CTX->N));
-    g(&(CTX->h), &buffer0, (const union uint512_u *)&(CTX->Sigma));
+    add512(&(CTX->N), &(CTX->buffer));
+    g(&(CTX->h), &buffer0, &(CTX->N));
+    g(&(CTX->h), &buffer0, &(CTX->Sigma));
 }
 
 /*
@@ -175,26 +188,30 @@ void gost2012_hash_block(gost2012_hash_ctx * CTX,
     
     if(bufsize==0){
         while(len>=64){
-        	memcpy(&CTX->buffer[bufsize], data, 64);
-		len   -= 64;
-		data  += 64; 
-		stage2(CTX);	
-	}
-    }	
+#ifdef UNALIGNED_MEM_ACCESS
+            stage2(CTX, (const union uint512_u *)data );
+#else
+            memcpy(&CTX->buffer.B[0], data, 64);
+                stage2(CTX, &(CTX->buffer) );
+#endif
+            len   -= 64;
+            data  += 64;            
+        }
+    }   
         
     while (len) {
         chunksize = 64 - bufsize;
         if (chunksize > len)
             chunksize = len;
 
-        memcpy(&CTX->buffer[bufsize], data, chunksize);
+        memcpy(&(CTX->buffer.B[bufsize]), data, chunksize);
 
         bufsize += chunksize;
         len     -= chunksize;
         data    += chunksize;
 
         if (bufsize == 64) {
-            stage2(CTX);
+            stage2(CTX, &(CTX->buffer) );
             bufsize = 0;
         }
     }
