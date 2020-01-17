@@ -22,12 +22,18 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
-#ifdef _AIO
-#define _GNU_SOURCE
-#endif
-#include <sys/sysinfo.h>
+
+
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef __linux__
+#include <sys/sysinfo.h>
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/sysctl.h>
+#endif
+
+
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -46,32 +52,7 @@
 
 #include "../gosthash2012.h"
 
-#ifdef _AIO
-#include <sys/syscall.h>    /* for __NR_* definitions */
-#include <libaio.h>
 
-///async IO syscall wrapper functions
-int 
-io_setup(int nr, io_context_t *ctxp){
-    return syscall(__NR_io_setup, nr, ctxp);
-}
-
-int 
-io_destroy(io_context_t ctx){
-    return syscall(__NR_io_destroy, ctx);
-}
-
-int 
-io_submit(io_context_t ctx, long nr,  struct iocb **iocbpp) {
-    return syscall(__NR_io_submit, ctx, nr, iocbpp);
-}
-
-int 
-io_getevents(io_context_t ctx, long min_nr, long max_nr,
-        struct io_event *events, struct timespec *timeout){
-    return syscall(__NR_io_getevents, ctx, min_nr, max_nr, events, timeout);
-}
-#endif
 
 static _Bool flag_noasync    = false;
 static _Bool flag_verbose    = false;
@@ -122,6 +103,23 @@ static _Bool flag_statistics = false;
 #define TWEAK_TASK_DISP     4  /*0 .. TASK_QUEUE_SIZE */
 #define TWEAK_TASK_RELEASE  1  /*0 .. TWEAK_TASK_DISP */
 #define TWEAK_TASK_FREE     2  /*0 .. TWEAK_TASK_DISP */
+
+inline static size_t get_ncpu(){
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+        int count;
+        size_t size=sizeof(count);
+        return sysctlbyname("hw.ncpu",&count,&size,NULL,0)?0:count;
+#elif defined(BOOST_HAS_UNISTD_H) && defined(_SC_NPROCESSORS_ONLN)
+        int const count=sysconf(_SC_NPROCESSORS_ONLN);
+        return (count>0)?count:0;
+#elif defined(__GLIBC__)
+        return get_nprocs();
+#else
+        return 0;
+#endif
+
+}
 
 ///simple and fast hex to bin conversion 
 inline static  unsigned int 
@@ -214,7 +212,7 @@ task_cmpdigest(const task_t* task, unsigned const char* actual){
 
 ///digest calculation routine based on libc file API 
 static int
-task_getdigest_libc(task_t* task, unsigned char* digest){
+task_getdigest(task_t* task, unsigned char* digest){
     
     unsigned char buff[ FILE_READ_BUF_SIZE ];
     size_t bytes;
@@ -254,89 +252,7 @@ err:
     return res;
 }
 
-#ifdef _AIO
 
-///digest calculation routine based on Linux AIO API
-static int
-task_getdigest_aio(task_t* task, unsigned char* digest){
-    
-    size_t sh;
-    long long offset;
-    size_t  len;
-    int res = S_OK;
-    unsigned char *buff;
-    struct iocb cb = {0};
-    struct io_event events[1];
-    struct iocb* iocbs = &cb;
-    io_context_t ctx = {0};
-    int fd;
-
-    if(task==NULL)
-        return S_ERR;
-    
-    if(task->filename==NULL && task->fcapacity==0){
-        return task_getdigest_libc(task, digest);
-    }
-    
-    if(io_setup(1, &ctx) < 0) {
-        handle_error("io_setup");
-    }
-    
-    fd = open(task->filename, O_RDONLY | O_DIRECT );  
-    if(fd==-1){
-        return S_ERR;
-    }
-    
-    if(posix_memalign((void **)&buff, 512, FILE_READ_BUF_SIZE * 2)!=0)
-        goto err;
-    
-    res = S_ERR;
-    offset = 0;
-    io_prep_pread(&cb, fd, buff, FILE_READ_BUF_SIZE, offset);
-    if(io_submit(ctx, 1, &iocbs) < 1 ){
-        goto err;
-    }
-        
-    sh = 0;
-    init_gost2012_hash_ctx(&task->ctx, (int) task->digest_size  * 8 );
-    
-    do{
-        if(io_getevents(ctx, 1, 1, events, NULL)!=1){
-            goto err;
-        }
-        printf("event %ld %ld \n", events[0].res, events[0].res2);
-        len = events[0].res2;
-        
-        if(len > 0){
-            unsigned char*  ptr = buff + sh;
-            //start new request
-            offset += len;
-            
-            sh = (sh + FILE_READ_BUF_SIZE) % (2 * FILE_READ_BUF_SIZE);
-            io_prep_pread(&cb, fd, buff+sh, FILE_READ_BUF_SIZE, offset);
-            if(io_submit(ctx, 1, &iocbs) < 1 ){
-                goto err;
-            }
-            
-            gost2012_hash_block(&task->ctx, ptr, len ); 
-        }   
-    }while(len>0);          
-    
-    gost2012_finish_hash(&task->ctx, digest);
-    res = S_OK;
-err:
-    
-    io_destroy(ctx);
-    free(buff);
-    close(fd);
-    
-    return res;
-}
-
-    static int task_getdigest(task_t* task, unsigned char* digest) __attribute__ ((alias ("task_getdigest_aio"))) ; 
-#else
-    static int task_getdigest(task_t* task, unsigned char* digest) __attribute__ ((alias ("task_getdigest_libc"))) ;  
-#endif
 
 inline static result_t
 task_validate(task_t* task){
@@ -597,7 +513,7 @@ check(const char* filename){
         test_error( pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE), "pthread_attr_setstacksize" );
         
         //some heuristics to figure out optimum number of worker threads
-        num_threads = get_nprocs();
+        num_threads = get_ncpu();
         if(num_threads<=0){
             num_threads = 2;
         }else if(num_threads>6){
@@ -767,7 +683,7 @@ check(const char* filename){
 
 static int  
 printusage(const char* executable){
-    fputs( "Calculates GOST R 34.11-2012 hash function\n\n", stderr);
+    fputs( "calculates GOST R 34.11-2012 hash function\n\n", stderr);
     fprintf(stderr, "%s [-hvl][-c checkfile|filename|-]\n", executable);	
 	fputs("\t-c check message digests (default is generate)\n"
             "\t-v verbose, print file names when checking\n"
@@ -775,7 +691,7 @@ printusage(const char* executable){
             "\t-h print this help\n"
 			"\t - use stdin to calculate hash\n"
             "The input for -c should be the list of message digests and file names\n"
-            "that is printed on stdout by this program when it generates digests.", stderr);
+            "that is printed on stdout by this program when it generates digests.\n", stderr);
 			
     return 1;
 }
@@ -816,7 +732,7 @@ main (int argc, char *argv[]){
         }
         
         t.digest_size = flag_longhash?64:32;
-        res = task_getdigest_libc(&t, actual);    
+        res = task_getdigest(&t, actual);    
         task_free(&t);
         if(res==S_OK){
             hex2out(actual,t.digest_size );

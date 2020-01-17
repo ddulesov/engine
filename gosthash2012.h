@@ -68,9 +68,9 @@
 #endif
 
 #ifdef _MSC_VER
-# define ALIGN(x) __declspec(align(x))
+# define GOST_ALIGN(x) __declspec(align(x))
 #else
-# define ALIGN(x) __attribute__ ((__aligned__(x)))
+# define GOST_ALIGN(x) __attribute__ ((__aligned__(x)))
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -83,7 +83,7 @@
 # endif
 #endif
 
-ALIGN(16)
+GOST_ALIGN(16)
 typedef union uint512_u {
     unsigned long long QWORD[8];
     unsigned char B[64];
