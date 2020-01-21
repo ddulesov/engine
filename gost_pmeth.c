@@ -25,7 +25,7 @@
 #define ossl3_const const
 #endif
 
-/* -----init, cleanup, copy - uniform for all algs790  --------------*/
+/* -----init, cleanup, copy - uniform for all algs  --------------*/
 /* Allocates new gost_pmeth_data structure and assigns it as data */
 static int pkey_gost_init(EVP_PKEY_CTX *ctx)
 {

@@ -20,7 +20,7 @@
 #include <string.h>
 #include <assert.h>
 #if defined(_MSC_VER)
-  /* MSVC doesn't fully support C99 VLA. The simples workaroud  is using 
+  /* MSVC doesn't fully support C99 VLA. The simples workaround  is using 
      big static array instead.
   */
 # define MAX_BUF_SIZE   144 
@@ -139,14 +139,14 @@ static const unsigned char E_cfb[] = {
     0xe1,0xc8,0x52,0xe9,0xa8,0x56,0x71,0x62,0xdb,0xb5,0xda,0x7f,0x66,0xde,0xa9,0x26,
 };
 
-static const unsigned char iv_ctr[]	= { 0x12,0x34,0x56,0x78,0x90,0xab,0xce,0xf0,
-					    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const unsigned char iv_ctr[] = { 0x12,0x34,0x56,0x78,0x90,0xab,0xce,0xf0,
+                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 /* Truncated to 128-bits IV from GOST examples. */
-static const unsigned char iv_128bit[]	= { 0x12,0x34,0x56,0x78,0x90,0xab,0xce,0xf0,
-					    0xa1,0xb2,0xc3,0xd4,0xe5,0xf0,0x01,0x12 };
+static const unsigned char iv_128bit[]  = { 0x12,0x34,0x56,0x78,0x90,0xab,0xce,0xf0,
+                        0xa1,0xb2,0xc3,0xd4,0xe5,0xf0,0x01,0x12 };
 /* Universal IV for ACPKM-Master. */
-static const unsigned char iv_acpkm_m[]	= { 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-					    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
+static const unsigned char iv_acpkm_m[] = { 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+                        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 static const unsigned char MAC_omac[] = { 0x33,0x6f,0x4d,0x29,0x60,0x59,0xfb,0xe3 };
 static const unsigned char MAC_omac_acpkm1[] = {
     0xB5,0x36,0x7F,0x47,0xB6,0x2B,0x99,0x5E,0xEB,0x2A,0x64,0x8C,0x58,0x43,0x14,0x5E,
@@ -172,7 +172,7 @@ static struct testcase testcases[] = {
     { "ctr-no-acpkm", cipher_gost_grasshopper_ctracpkm, 1, P,   E_ctr,   sizeof(P),       iv_ctr, sizeof(iv_ctr), 0 },
     { "ctracpkm", cipher_gost_grasshopper_ctracpkm, 1, P_acpkm, E_acpkm, sizeof(P_acpkm), iv_ctr, sizeof(iv_ctr), 256 / 8 },
     { "acpkm-Master", cipher_gost_grasshopper_ctracpkm, 0, P_acpkm_master, E_acpkm_master, sizeof(P_acpkm_master),
-	iv_acpkm_m, sizeof(iv_acpkm_m), 768 / 8 },
+    iv_acpkm_m, sizeof(iv_acpkm_m), 768 / 8 },
     { "ofb", cipher_gost_grasshopper_ofb, 1, P,  E_ofb,  sizeof(P),  iv_128bit,  sizeof(iv_128bit), 0 },
     { "cbc", cipher_gost_grasshopper_cbc, 0, P,  E_cbc,  sizeof(P),  iv_128bit,  sizeof(iv_128bit), 0 },
     { "cfb", cipher_gost_grasshopper_cfb, 0, P,  E_cfb,  sizeof(P),  iv_128bit,  sizeof(iv_128bit), 0 },
@@ -194,17 +194,17 @@ static int test_block(const EVP_CIPHER *type, const char *name,
 
     OPENSSL_assert(ctx);
     printf("Encryption test from %s [%s] %s\n", standard, name,
-	inplace ? "in-place" : "out-of-place");
+    inplace ? "in-place" : "out-of-place");
     /* test with single big chunk */
     EVP_CIPHER_CTX_init(ctx);
     T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, 1));
     T(EVP_CIPHER_CTX_set_padding(ctx, 0));
     if (inplace)
-	memcpy(c, pt, size);
+        memcpy(c, pt, size);
     else
-	memset(c, 0, size);
+        memset(c, 0, size);
     if (acpkm)
-	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
+        T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     T(EVP_CipherUpdate(ctx, c, &outlen, inplace? c : pt, size));
     T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
     EVP_CIPHER_CTX_cleanup(ctx);
@@ -216,23 +216,23 @@ static int test_block(const EVP_CIPHER *type, const char *name,
 
     /* test with small chunks of block size */
     printf("Chunked encryption test from %s [%s] %s\n", standard, name,
-	inplace ? "in-place" : "out-of-place");
+    inplace ? "in-place" : "out-of-place");
     int blocks = size / GRASSHOPPER_BLOCK_SIZE;
     int z;
     EVP_CIPHER_CTX_init(ctx);
     T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, 1));
     T(EVP_CIPHER_CTX_set_padding(ctx, 0));
     if (inplace)
-	memcpy(c, pt, size);
+        memcpy(c, pt, size);
     else
-	memset(c, 0, size);
+        memset(c, 0, size);
     if (acpkm)
-	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
+        T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     for (z = 0; z < blocks; z++) {
-	int offset = z * GRASSHOPPER_BLOCK_SIZE;
-	int sz = GRASSHOPPER_BLOCK_SIZE;
+        int offset = z * GRASSHOPPER_BLOCK_SIZE;
+        int sz = GRASSHOPPER_BLOCK_SIZE;
 
-	T(EVP_CipherUpdate(ctx, c + offset, &outlen, (inplace ? c : pt) + offset, sz));
+        T(EVP_CipherUpdate(ctx, c + offset, &outlen, (inplace ? c : pt) + offset, sz));
     }
     outlen = z * GRASSHOPPER_BLOCK_SIZE;
     T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
@@ -245,16 +245,16 @@ static int test_block(const EVP_CIPHER *type, const char *name,
 
     /* test with single big chunk */
     printf("Decryption test from %s [%s] %s\n", standard, name,
-	inplace ? "in-place" : "out-of-place");
+    inplace ? "in-place" : "out-of-place");
     EVP_CIPHER_CTX_init(ctx);
     T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, 0));
     T(EVP_CIPHER_CTX_set_padding(ctx, 0));
     if (inplace)
-	memcpy(c, exp, size);
+        memcpy(c, exp, size);
     else
-	memset(c, 0, size);
+        memset(c, 0, size);
     if (acpkm)
-	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
+        T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     T(EVP_CipherUpdate(ctx, c, &outlen, inplace ? c : exp, size));
     T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
     EVP_CIPHER_CTX_cleanup(ctx);
@@ -282,31 +282,31 @@ static int test_stream(const EVP_CIPHER *type, const char *name,
     /* Cycle through all lengths from 1 upto maximum size */
     printf("Stream encryption test from %s [%s] \n", standard, name);
     for (z = 1; z <= size; z++) {
-	int outlen, tmplen;
-	int sz = 0;
-	int i;
+        int outlen, tmplen;
+        int sz = 0;
+        int i;
 
-	EVP_CIPHER_CTX_init(ctx);
-	T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, 1));
-	T(EVP_CIPHER_CTX_set_padding(ctx, 0));
-	memset(c, 0xff, size);
-	if (acpkm)
-	    T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
-	for (i = 0; i < size; i += z) {
-	    if (i + z > size)
-		sz = size - i;
-	    else
-		sz = z;
-	    T(EVP_CipherUpdate(ctx, c + i, &outlen, pt + i, sz));
-	    OPENSSL_assert(outlen == sz);
-	}
-	outlen = i - z + sz;
-	T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
-	EVP_CIPHER_CTX_cleanup(ctx);
+        EVP_CIPHER_CTX_init(ctx);
+        T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, 1));
+        T(EVP_CIPHER_CTX_set_padding(ctx, 0));
+        memset(c, 0xff, size);
+        if (acpkm)
+            T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
+        for (i = 0; i < size; i += z) {
+            if (i + z > size)
+            sz = size - i;
+            else
+            sz = z;
+            T(EVP_CipherUpdate(ctx, c + i, &outlen, pt + i, sz));
+            OPENSSL_assert(outlen == sz);
+        }
+        outlen = i - z + sz;
+        T(EVP_CipherFinal_ex(ctx, c + outlen, &tmplen));
+        EVP_CIPHER_CTX_cleanup(ctx);
 
-	test = outlen != size || memcmp(c, exp, size);
-	printf("%c", test ? 'E' : '+');
-	ret |= test;
+        test = outlen != size || memcmp(c, exp, size);
+        printf("%c", test ? 'E' : '+');
+        ret |= test;
     }
     printf("\n");
     TEST_ASSERT(ret);
@@ -331,21 +331,21 @@ static int test_mac(const char *name, const char *from,
     T(EVP_DigestInit_ex(ctx, type, NULL));
     T(EVP_MD_CTX_ctrl(ctx, EVP_MD_CTRL_SET_KEY, sizeof(K), (void *)K));
     if (acpkm)
-	T(EVP_MD_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, acpkm_t ? &acpkm_t : NULL));
+        T(EVP_MD_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, acpkm_t ? &acpkm_t : NULL));
     T(EVP_DigestUpdate(ctx, pt, pt_size));
     if (EVP_MD_flags(EVP_MD_CTX_md(ctx)) & EVP_MD_FLAG_XOF) {
-	T(EVP_DigestFinalXOF(ctx, md_value, mac_size));
-	md_len = (unsigned int)mac_size;
+        T(EVP_DigestFinalXOF(ctx, md_value, mac_size));
+        md_len = (unsigned int)mac_size;
     } else {
-	T(EVP_MD_CTX_size(ctx) == mac_size);
-	T(EVP_DigestFinal_ex(ctx, md_value, &md_len));
+        T(EVP_MD_CTX_size(ctx) == mac_size);
+        T(EVP_DigestFinal_ex(ctx, md_value, &md_len));
     }
     EVP_MD_CTX_free(ctx);
     printf("  MAC[%u] = ", md_len);
     hexdump_inline(md_value, mac_size);
 
     TEST_ASSERT(md_len != mac_size ||
-	memcmp(mac, md_value, mac_size));
+    memcmp(mac, md_value, mac_size));
 
     return test;
 }
@@ -365,18 +365,18 @@ int main(int argc, char **argv)
     T(ENGINE_set_default(eng, ENGINE_METHOD_ALL));
 
     for (t = testcases; t->name; t++) {
-	int inplace;
-	const char *standard = t->acpkm? "R 23565.1.017-2018" : "GOST R 34.13-2015";
+        int inplace;
+        const char *standard = t->acpkm? "R 23565.1.017-2018" : "GOST R 34.13-2015";
 
-	printf(cBLUE "# Tests for %s [%s]\n" cNORM, t->name, standard);
-	for (inplace = 0; inplace <= 1; inplace++)
-	    ret |= test_block(t->type(), t->name,
-		t->plaintext, t->expected, t->size,
-		t->iv, t->iv_size, t->acpkm, inplace);
-	if (t->stream)
-	    ret |= test_stream(t->type(), t->name,
-		t->plaintext, t->expected, t->size,
-		t->iv, t->iv_size, t->acpkm);
+        printf(cBLUE "# Tests for %s [%s]\n" cNORM, t->name, standard);
+        for (inplace = 0; inplace <= 1; inplace++)
+            ret |= test_block(t->type(), t->name,
+            t->plaintext, t->expected, t->size,
+            t->iv, t->iv_size, t->acpkm, inplace);
+        if (t->stream)
+            ret |= test_stream(t->type(), t->name,
+            t->plaintext, t->expected, t->size,
+            t->iv, t->iv_size, t->acpkm);
     }
 
     printf(cBLUE "# Tests for omac\n" cNORM);
@@ -395,9 +395,9 @@ int main(int argc, char **argv)
     ENGINE_free(eng);
 
     if (ret)
-	printf(cDRED "= Some tests FAILED!\n" cNORM);
+        printf(cDRED "= Some tests FAILED!\n" cNORM);
     else
-	printf(cDGREEN "= All tests passed!\n" cNORM);
+        printf(cDGREEN "= All tests passed!\n" cNORM);
     restoreConsole();
     return ret;
 }

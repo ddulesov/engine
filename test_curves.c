@@ -60,14 +60,14 @@ static int parameter_test(struct test_curve *tc)
 
     printf(cBLUE "Test curve NID %d" cNORM, nid);
     if (tc->name)
-	printf(cBLUE ": %s" cNORM, tc->name);
+		printf(cBLUE ": %s" cNORM, tc->name);
     else if (OBJ_nid2sn(nid))
-	printf(cBLUE ": %s" cNORM, OBJ_nid2sn(nid));
-    printf("\n");
+		printf(cBLUE ": %s" cNORM, OBJ_nid2sn(nid));
+	printf("\n");
 
     if (!OBJ_nid2obj(nid)) {
-	printf(cRED "NID %d not found\n" cNORM, nid);
-	return 1;
+		printf(cRED "NID %d not found\n" cNORM, nid);
+		return 1;
     }
 
     /* nid resolves in both directions */
@@ -75,16 +75,16 @@ static int parameter_test(struct test_curve *tc)
     T(sn = OBJ_nid2sn(nid));
     T(ln = OBJ_nid2ln(nid));
     if (tc->name)
-	T(!strcmp(tc->name, OBJ_nid2sn(nid)));
+		T(!strcmp(tc->name, OBJ_nid2sn(nid)));
     T(nid == OBJ_sn2nid(sn));
     T(nid == OBJ_ln2nid(ln));
 
     EC_KEY *ec;
     T(ec = EC_KEY_new());
     if (!fill_GOST_EC_params(ec, nid)) {
-	printf(cRED "fill_GOST_EC_params FAIL\n" cNORM);
-	ERR_print_errors_fp(stderr);
-	return 1;
+		printf(cRED "fill_GOST_EC_params FAIL\n" cNORM);
+		ERR_print_errors_fp(stderr);
+		return 1;
     }
 
     const EC_GROUP *group;
@@ -208,16 +208,16 @@ int main(int argc, char **argv)
 
     struct test_curve *tc;
     for (tc = test_curves; tc->nid; tc++) {
-	ret |= parameter_test(tc);
+		ret |= parameter_test(tc);
     }
 
     ENGINE_finish(eng);
     ENGINE_free(eng);
 
     if (ret)
-	printf(cDRED "= Some tests FAILED!\n" cNORM);
+		printf(cDRED "= Some tests FAILED!\n" cNORM);
     else
-	printf(cDGREEN "= All tests passed!\n" cNORM);
+		printf(cDGREEN "= All tests passed!\n" cNORM);
     
     restoreConsole();
     return ret;

@@ -48,19 +48,19 @@ static struct test_sign test_signs[] = {
 static void print_test_tf(int err, int val, const char *t, const char *f)
 {
     if (err == 1)
-	printf(cGREEN "%s\n" cNORM, t);
+        printf(cGREEN "%s\n" cNORM, t);
     else
-	printf(cRED "%s [%d]\n" cNORM, f, val);
+        printf(cRED "%s [%d]\n" cNORM, f, val);
 }
 
 static void print_test_result(int err)
 {
     if (err == 1)
-	printf(cGREEN "success\n" cNORM);
+        printf(cGREEN "success\n" cNORM);
     else if (err == 0)
-	printf(cRED "failure\n" cNORM);
+        printf(cRED "failure\n" cNORM);
     else
-	ERR_print_errors_fp(stderr);
+        ERR_print_errors_fp(stderr);
 }
 
 static int test_sign(struct test_sign *t)
@@ -74,13 +74,13 @@ static int test_sign(struct test_sign *t)
     int type = 0;
     const char *algname = NULL;
     switch (t->bits) {
-	case 256:
-	    type = NID_id_GostR3410_2012_256;
-	    algname = "gost2012_256";
-	    break;
-	case 512:
-	    type = NID_id_GostR3410_2012_512;
-	    algname = "gost2012_512";
+        case 256:
+            type = NID_id_GostR3410_2012_256;
+            algname = "gost2012_256";
+            break;
+        case 512:
+            type = NID_id_GostR3410_2012_512;
+            algname = "gost2012_512";
     }
 
     /* Keygen. */
@@ -98,7 +98,7 @@ static int test_sign(struct test_sign *t)
     EVP_PKEY_CTX_free(ctx);
     EVP_PKEY_free(pkey);
     if (err != 1)
-	return -1;
+        return -1;
 
     /* Create another key using string interface. */
     EVP_PKEY *key1;
@@ -213,15 +213,15 @@ int main(int argc, char **argv)
 
     struct test_sign *sp;
     for (sp = test_signs; sp->name; sp++)
-	ret |= test_sign(sp);
+        ret |= test_sign(sp);
 
     ENGINE_finish(eng);
     ENGINE_free(eng);
 
     if (ret)
-	printf(cDRED "= Some tests FAILED!\n" cNORM);
+        printf(cDRED "= Some tests FAILED!\n" cNORM);
     else
-	printf(cDGREEN "= All tests passed!\n" cNORM);
+        printf(cDGREEN "= All tests passed!\n" cNORM);
     restoreConsole();
     return ret;
 }

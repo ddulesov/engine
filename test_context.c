@@ -43,7 +43,7 @@ static int test_contexts(const EVP_CIPHER *type, const int enc, const char *msg,
     T(ctx);
     T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, enc));
     if (acpkm)
-	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
+    T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
     T(EVP_CIPHER_CTX_set_padding(ctx, 0));
     T(EVP_CipherUpdate(ctx, b, &outlen, pt, sizeof(b)));
     T(EVP_CipherFinal_ex(ctx, b + outlen, &tmplen));
@@ -55,21 +55,21 @@ static int test_contexts(const EVP_CIPHER *type, const int enc, const char *msg,
     T(EVP_CipherInit_ex(ctx, type, NULL, K, iv, enc));
     T(EVP_CIPHER_CTX_set_padding(ctx, 0));
     if (acpkm)
-	T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
+    T(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_KEY_MESH, acpkm, NULL));
 
     save = ctx;
     int i;
     memset(c, 0, sizeof(c));
     for (i = 0; i < TEST_SIZE / STEP_SIZE; i++) {
-	EVP_CIPHER_CTX *copy = EVP_CIPHER_CTX_new();
-	T(copy);
-	T(EVP_CIPHER_CTX_copy(copy, ctx));
-	if (save != ctx) /* else original context */
-	    EVP_CIPHER_CTX_free(ctx);
-	ctx = copy;
+    EVP_CIPHER_CTX *copy = EVP_CIPHER_CTX_new();
+    T(copy);
+    T(EVP_CIPHER_CTX_copy(copy, ctx));
+    if (save != ctx) /* else original context */
+        EVP_CIPHER_CTX_free(ctx);
+    ctx = copy;
 
-	T(EVP_CipherUpdate(ctx, c + STEP_SIZE * i, &outlen,
-	       	pt + STEP_SIZE * i, STEP_SIZE));
+    T(EVP_CipherUpdate(ctx, c + STEP_SIZE * i, &outlen,
+            pt + STEP_SIZE * i, STEP_SIZE));
     }
 
     outlen = i * GRASSHOPPER_BLOCK_SIZE;
@@ -77,10 +77,10 @@ static int test_contexts(const EVP_CIPHER *type, const int enc, const char *msg,
     TEST_ASSERT(outlen != TEST_SIZE || memcmp(c, b, TEST_SIZE) );
     EVP_CIPHER_CTX_free(ctx);
     if (test) {
-	printf("  b[%d] = ", outlen);
-	hexdump_inline(b, outlen);
-	printf("  c[%d] = ", outlen);
-	hexdump_inline(c, outlen);
+    printf("  b[%d] = ", outlen);
+    hexdump_inline(b, outlen);
+    printf("  c[%d] = ", outlen);
+    hexdump_inline(c, outlen);
     }
     ret |= test;
 
@@ -94,10 +94,10 @@ static int test_contexts(const EVP_CIPHER *type, const int enc, const char *msg,
     EVP_CIPHER_CTX_cleanup(save);
     EVP_CIPHER_CTX_free(save);
     if (test) {
-	printf("  b[%d] = ", outlen);
-	hexdump_inline(b, outlen);
-	printf("  c[%d] = ", outlen);
-	hexdump_inline(c, outlen);
+    printf("  b[%d] = ", outlen);
+    hexdump_inline(b, outlen);
+    printf("  c[%d] = ", outlen);
+    hexdump_inline(c, outlen);
     }
     ret |= test;
 
@@ -122,9 +122,9 @@ int main(int argc, char **argv)
     ret |= test_contexts(cipher_gost_grasshopper_ctracpkm(), 0, "grasshopper ctracpkm", 256 / 8);
 
     if (ret)
-	printf(cDRED "= Some tests FAILED!\n" cNORM);
+    printf(cDRED "= Some tests FAILED!\n" cNORM);
     else
-	printf(cDGREEN "= All tests passed!\n" cNORM);
+    printf(cDGREEN "= All tests passed!\n" cNORM);
     restoreConsole();
     return ret;
 }

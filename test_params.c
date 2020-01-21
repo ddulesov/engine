@@ -22,13 +22,13 @@
 #include <string.h>
 
 struct test_param {
-    unsigned int param;		/* NID of EC parameters */
-    unsigned int len;		/* length of a digest or a half of the key */
-    unsigned int data_len;	/* length of @data */
-    const uint8_t *data;	/* data to hash (optional) */
-    const uint8_t *hash;	/* hash of data */
-    const uint8_t *signature;	/* raw signature */
-    const uint8_t *pub_key;	/* raw public key */
+    unsigned int param;     /* NID of EC parameters */
+    unsigned int len;       /* length of a digest or a half of the key */
+    unsigned int data_len;  /* length of @data */
+    const uint8_t *data;    /* data to hash (optional) */
+    const uint8_t *hash;    /* hash of data */
+    const uint8_t *signature;   /* raw signature */
+    const uint8_t *pub_key; /* raw public key */
 };
 
 /*
@@ -380,73 +380,73 @@ const uint8_t pubkey_tc26_gost_3410_12_512_setC[] = {
 /* end */
 
 static struct test_param cp_2001_256_a = {
-    .param	= NID_id_GostR3410_2001_CryptoPro_A_ParamSet,
-    .len	= 256 / 8,
-    .data	= data_2001_256_setA,
-    .data_len	= sizeof(data_2001_256_setA),
-    .hash	= hash_2001_256_setA,
-    .signature	= signature_2001_256_setA,
-    .pub_key	= pubkey_2001_256_setA,
+    .param  = NID_id_GostR3410_2001_CryptoPro_A_ParamSet,
+    .len    = 256 / 8,
+    .data   = data_2001_256_setA,
+    .data_len   = sizeof(data_2001_256_setA),
+    .hash   = hash_2001_256_setA,
+    .signature  = signature_2001_256_setA,
+    .pub_key    = pubkey_2001_256_setA,
 };
 
 static struct test_param cp_2001_256_b = {
-    .param	= NID_id_GostR3410_2001_CryptoPro_B_ParamSet,
-    .len	= 256 / 8,
-    .data	= data_2001_256_setB,
-    .data_len	= sizeof(data_2001_256_setB),
-    .hash	= hash_2001_256_setB,
-    .signature	= signature_2001_256_setB,
-    .pub_key	= pubkey_2001_256_setB,
+    .param  = NID_id_GostR3410_2001_CryptoPro_B_ParamSet,
+    .len    = 256 / 8,
+    .data   = data_2001_256_setB,
+    .data_len   = sizeof(data_2001_256_setB),
+    .hash   = hash_2001_256_setB,
+    .signature  = signature_2001_256_setB,
+    .pub_key    = pubkey_2001_256_setB,
 };
 
 static struct test_param cp_2001_256_c = {
-    .param	= NID_id_GostR3410_2001_CryptoPro_C_ParamSet,
-    .len	= 256 / 8,
-    .data	= data_2001_256_setC,
-    .data_len	= sizeof(data_2001_256_setC),
-    .hash	= hash_2001_256_setC,
-    .signature	= signature_2001_256_setC,
-    .pub_key	= pubkey_2001_256_setC,
+    .param  = NID_id_GostR3410_2001_CryptoPro_C_ParamSet,
+    .len    = 256 / 8,
+    .data   = data_2001_256_setC,
+    .data_len   = sizeof(data_2001_256_setC),
+    .hash   = hash_2001_256_setC,
+    .signature  = signature_2001_256_setC,
+    .pub_key    = pubkey_2001_256_setC,
 };
 
 static struct test_param tc_2012_256_a = {
-    .param	= NID_id_tc26_gost_3410_2012_256_paramSetA,
-    .len	= 256 / 8,
-    .data	= data_tc26_gost_3410_12_256_setA,
-    .data_len	= sizeof(data_tc26_gost_3410_12_256_setA),
-    .hash	= hash_tc26_gost_3410_12_256_setA,
-    .signature	= signature_tc26_gost_3410_12_256_setA,
-    .pub_key	= pubkey_tc26_gost_3410_12_256_setA,
+    .param  = NID_id_tc26_gost_3410_2012_256_paramSetA,
+    .len    = 256 / 8,
+    .data   = data_tc26_gost_3410_12_256_setA,
+    .data_len   = sizeof(data_tc26_gost_3410_12_256_setA),
+    .hash   = hash_tc26_gost_3410_12_256_setA,
+    .signature  = signature_tc26_gost_3410_12_256_setA,
+    .pub_key    = pubkey_tc26_gost_3410_12_256_setA,
 };
 
 static struct test_param tc_2012_512_a = {
-    .param	= NID_id_tc26_gost_3410_2012_512_paramSetA,
-    .len	= 512 / 8,
-    .data	= data_tc26_gost_3410_12_512_setA,
-    .data_len	= sizeof(data_tc26_gost_3410_12_512_setA),
-    .hash	= hash_tc26_gost_3410_12_512_setA,
-    .signature	= signature_tc26_gost_3410_12_512_setA,
-    .pub_key	= pubkey_tc26_gost_3410_12_512_setA,
+    .param  = NID_id_tc26_gost_3410_2012_512_paramSetA,
+    .len    = 512 / 8,
+    .data   = data_tc26_gost_3410_12_512_setA,
+    .data_len   = sizeof(data_tc26_gost_3410_12_512_setA),
+    .hash   = hash_tc26_gost_3410_12_512_setA,
+    .signature  = signature_tc26_gost_3410_12_512_setA,
+    .pub_key    = pubkey_tc26_gost_3410_12_512_setA,
 };
 
 static struct test_param tc_2012_512_b = {
-    .param	= NID_id_tc26_gost_3410_2012_512_paramSetB,
-    .len	= 512 / 8,
-    .data	= data_tc26_gost_3410_12_512_setB,
-    .data_len	= sizeof(data_tc26_gost_3410_12_512_setB),
-    .hash	= hash_tc26_gost_3410_12_512_setB,
-    .signature	= signature_tc26_gost_3410_12_512_setB,
-    .pub_key	= pubkey_tc26_gost_3410_12_512_setB,
+    .param  = NID_id_tc26_gost_3410_2012_512_paramSetB,
+    .len    = 512 / 8,
+    .data   = data_tc26_gost_3410_12_512_setB,
+    .data_len   = sizeof(data_tc26_gost_3410_12_512_setB),
+    .hash   = hash_tc26_gost_3410_12_512_setB,
+    .signature  = signature_tc26_gost_3410_12_512_setB,
+    .pub_key    = pubkey_tc26_gost_3410_12_512_setB,
 };
 
 static struct test_param tc_2012_512_c = {
-    .param	= NID_id_tc26_gost_3410_2012_512_paramSetC,
-    .len	= 512 / 8,
-    .data	= data_tc26_gost_3410_12_512_setC,
-    .data_len	= sizeof(data_tc26_gost_3410_12_512_setC),
-    .hash	= hash_tc26_gost_3410_12_512_setC,
-    .signature	= signature_tc26_gost_3410_12_512_setC,
-    .pub_key	= pubkey_tc26_gost_3410_12_512_setC,
+    .param  = NID_id_tc26_gost_3410_2012_512_paramSetC,
+    .len    = 512 / 8,
+    .data   = data_tc26_gost_3410_12_512_setC,
+    .data_len   = sizeof(data_tc26_gost_3410_12_512_setC),
+    .hash   = hash_tc26_gost_3410_12_512_setC,
+    .signature  = signature_tc26_gost_3410_12_512_setC,
+    .pub_key    = pubkey_tc26_gost_3410_12_512_setC,
 };
 
 static struct test_param *test_params[] = {
@@ -840,11 +840,11 @@ static struct test_cert {
 static void print_test_result(int err)
 {
     if (err == 1)
-	printf(cGREEN "correct\n" cNORM);
+        printf(cGREEN "correct\n" cNORM);
     else if (err == 0)
-	printf(cRED "incorrect\n" cNORM);
+        printf(cRED "incorrect\n" cNORM);
     else
-	ERR_print_errors_fp(stderr);
+        ERR_print_errors_fp(stderr);
 }
 
 static int test_cert(struct test_cert *tc)
@@ -953,24 +953,24 @@ static int test_param(struct test_param *t)
     printf(cBLUE "Test %s (cp):\n" cNORM, sn);
 
     switch (t->len) {
-	case 256 / 8:
-	    type = NID_id_GostR3410_2012_256;
-	    break;
-	case 512 / 8:
-	    type = NID_id_GostR3410_2012_512;
-	    break;
-	default:
-	    OpenSSLDie(__FILE__, __LINE__, "invalid len");
+        case 256 / 8:
+            type = NID_id_GostR3410_2012_256;
+            break;
+        case 512 / 8:
+            type = NID_id_GostR3410_2012_512;
+            break;
+        default:
+            OpenSSLDie(__FILE__, __LINE__, "invalid len");
     }
     switch (type) {
-	case NID_id_GostR3410_2012_256:
-	    hash_nid = NID_id_GostR3411_2012_256;
-	    break;
-	case NID_id_GostR3410_2012_512:
-	    hash_nid = NID_id_GostR3411_2012_512;
-	    break;
-	default:
-	    OpenSSLDie(__FILE__, __LINE__, "invalid type");
+        case NID_id_GostR3410_2012_256:
+            hash_nid = NID_id_GostR3411_2012_256;
+            break;
+        case NID_id_GostR3410_2012_512:
+            hash_nid = NID_id_GostR3411_2012_512;
+            break;
+        default:
+            OpenSSLDie(__FILE__, __LINE__, "invalid type");
     }
 
     /* Manually construct public key */
@@ -1020,35 +1020,35 @@ static int test_param(struct test_param *t)
 
     /* Verify using EVP_Verify API */
     if (t->data) {
-	printf("  EVP_Verify API\t\t");
-	EVP_MD_CTX *md_ctx;
-	T(md_ctx = EVP_MD_CTX_new());
-	const EVP_MD *mdtype;
-	T(mdtype = EVP_get_digestbynid(hash_nid));
-	T(EVP_VerifyInit(md_ctx, mdtype));
-	/* Feed byte-by-byte. */
-	unsigned int i;
-	for (i = 0; i < t->data_len; i++)
-	    T(EVP_VerifyUpdate(md_ctx, &t->data[i], 1));
-	err = EVP_VerifyFinal(md_ctx, sig, siglen, pkey);
-	print_test_result(err);
-	EVP_MD_CTX_free(md_ctx);
-	ret |= err != 1;
+        printf("  EVP_Verify API\t\t");
+        EVP_MD_CTX *md_ctx;
+        T(md_ctx = EVP_MD_CTX_new());
+        const EVP_MD *mdtype;
+        T(mdtype = EVP_get_digestbynid(hash_nid));
+        T(EVP_VerifyInit(md_ctx, mdtype));
+        /* Feed byte-by-byte. */
+        unsigned int i;
+        for (i = 0; i < t->data_len; i++)
+            T(EVP_VerifyUpdate(md_ctx, &t->data[i], 1));
+        err = EVP_VerifyFinal(md_ctx, sig, siglen, pkey);
+        print_test_result(err);
+        EVP_MD_CTX_free(md_ctx);
+        ret |= err != 1;
     }
 
     /* Verify using EVP_DigestVerifyInit API */
     if (t->data) {
-	printf("  EVP_DigestVerifyInit API\t");
-	EVP_MD_CTX *md_ctx;
-	T(md_ctx = EVP_MD_CTX_new());
-	const EVP_MD *mdtype;
-	T(mdtype = EVP_get_digestbynid(hash_nid));
-	T(EVP_DigestVerifyInit(md_ctx, NULL, mdtype, NULL, pkey));
-	/* Verify in one step. */
-	err = EVP_DigestVerify(md_ctx, sig, siglen, t->data, t->data_len);
-	print_test_result(err);
-	EVP_MD_CTX_free(md_ctx);
-	ret |= err != 1;
+        printf("  EVP_DigestVerifyInit API\t");
+        EVP_MD_CTX *md_ctx;
+        T(md_ctx = EVP_MD_CTX_new());
+        const EVP_MD *mdtype;
+        T(mdtype = EVP_get_digestbynid(hash_nid));
+        T(EVP_DigestVerifyInit(md_ctx, NULL, mdtype, NULL, pkey));
+        /* Verify in one step. */
+        err = EVP_DigestVerify(md_ctx, sig, siglen, t->data, t->data_len);
+        print_test_result(err);
+        EVP_MD_CTX_free(md_ctx);
+        ret |= err != 1;
     }
 
     OPENSSL_free(sig);
@@ -1070,11 +1070,11 @@ int main(int argc, char **argv)
 
     struct test_param **tpp;
     for (tpp = test_params; *tpp; tpp++)
-	ret |= test_param(*tpp);
+        ret |= test_param(*tpp);
 
     struct test_cert *tc;
     for (tc = test_certs; tc->cert; tc++)
-	ret |= test_cert(tc);
+        ret |= test_cert(tc);
 
     ENGINE_finish(eng);
     ENGINE_free(eng);

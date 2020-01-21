@@ -3,10 +3,7 @@
 
 
 
-#define T(e) do{    if (!(e)) {\
-	  ERR_print_errors_fp(stderr);\
-	  OpenSSLDie(__FILE__, __LINE__, #e); }\
-        }while (0)
+#define T(e) do{ if (!(e)) { ERR_print_errors_fp(stderr); OpenSSLDie(__FILE__, __LINE__, #e); } }while (0)
 
 #define TE(e) do{ if (!(e)) { \
                 ERR_print_errors_fp(stderr); \
@@ -20,13 +17,10 @@
              
 
 #ifdef __GNUC__
-#define _UNUSED_ __attribute__ ((unused))
+# define _UNUSED_ __attribute__ ((unused))
 #else
-#define _UNUSED_
+# define _UNUSED_
 #endif
-
-
-
 
 _UNUSED_ static void hexdump(FILE *f, const char *title, const unsigned char *s, int l)
 {
@@ -47,8 +41,8 @@ _UNUSED_ static void hexdump_inline(const void *ptr, size_t len)
     size_t i, j;
 
     for (i = 0; i < len; i += j) {
-	for (j = 0; j < 16 && i + j < len; j++)
-	    printf("%s%02x", j? "" : " ", p[i + j]);
+    for (j = 0; j < 16 && i + j < len; j++)
+        printf("%s%02x", j? "" : " ", p[i + j]);
     }
     printf("\n");
 }
