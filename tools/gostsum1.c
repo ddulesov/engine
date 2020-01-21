@@ -23,7 +23,6 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
 
-
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -33,16 +32,12 @@
 #include <sys/sysctl.h>
 #endif
 
-
-
 #include <stdatomic.h>
 #include <stdbool.h>
-
 #include <pthread.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
@@ -52,36 +47,33 @@
 
 #include "../gosthash2012.h"
 
-
-
 static _Bool flag_noasync    = false;
 static _Bool flag_verbose    = false;
 static _Bool flag_longhash   = false;
-static _Bool flag_stdin      = false;
 static _Bool flag_statistics = false;
 
 #define handle_error_en(en, msg) \
-       do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
+    do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
 #define handle_error(msg) \
-       do { perror(msg); exit(EXIT_FAILURE); } while (0)
+    do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 #define test_error( f, msg ) \
-        do{ s = f; if(s!=0){ errno=s; perror(msg); exit(EXIT_FAILURE); } } while (0)
+    do { int _s = f; if(_s!=0){ errno=_s; perror(msg); exit(EXIT_FAILURE); } } while (0)
                
 #define RES_INIT    0x0000
 #define RES_SUBM    0x0001
 #define RES_TAKE    0x0002
-
-#define RES_COMP_MASK  0xFF00
-
 #define RES_HEQU    0xFF00
 #define RES_HDIFF   0xFF01
 #define RES_EFILE   0xFF02
+#define RES_COMP_MASK  0xFF00
 
 #define IS_RESULT_OK(task_res)     (task_res == RES_HEQU)
 #define IS_RESULT_ERR(task_res)    (task_res != RES_HEQU)
 
+#define MIN_THREAD_COUNT    2
+#define MAX_THREAD_COUNT    8
 #define DEF_FNAME_LEN       256
 
 #define FILE_READ_BUF_SIZE  (1024 * 8)
@@ -97,32 +89,31 @@ static _Bool flag_statistics = false;
 #define S_ERR_MEM       3
 #define S_ERR           4
 
+/* tweak async task parameters */
 #define TASK_QUEUE_SIZE     10  /* 4 .. 126 */
+#define TWEAK_TASK_MAIN_LOOP 0  /*0 ..  */
+#define TWEAK_TASK_DISP      4  /*0 .. TASK_QUEUE_SIZE */
+#define TWEAK_TASK_RELEASE   1  /*0 .. TWEAK_TASK_DISP */
+#define TWEAK_TASK_FREE      2  /*0 .. TWEAK_TASK_DISP */
 
-#define TWEAK_TASK_MAIN_LOOP 0 /*0 ..  */
-#define TWEAK_TASK_DISP     4  /*0 .. TASK_QUEUE_SIZE */
-#define TWEAK_TASK_RELEASE  1  /*0 .. TWEAK_TASK_DISP */
-#define TWEAK_TASK_FREE     2  /*0 .. TWEAK_TASK_DISP */
-
-inline static size_t get_ncpu(){
-
+static inline size_t 
+get_ncpu(){
 #if defined(__APPLE__) || defined(__FreeBSD__)
-        int count;
-        size_t size=sizeof(count);
-        return sysctlbyname("hw.ncpu",&count,&size,NULL,0)?0:count;
-#elif defined(BOOST_HAS_UNISTD_H) && defined(_SC_NPROCESSORS_ONLN)
-        int const count=sysconf(_SC_NPROCESSORS_ONLN);
-        return (count>0)?count:0;
+    int count;
+    size_t size=sizeof(count);
+    return sysctlbyname("hw.ncpu",&count,&size,NULL,0)?0:count;
+#elif defined(_SC_NPROCESSORS_ONLN)
+    int const count=sysconf(_SC_NPROCESSORS_ONLN);
+    return (count>0)?count:0;
 #elif defined(__GLIBC__)
-        return get_nprocs();
+    return get_nprocs();
 #else
-        return 0;
+    return 0;
 #endif
-
 }
 
 ///simple and fast hex to bin conversion 
-inline static  unsigned int 
+static inline  unsigned int 
 _hex2bin(int c) {
     c -= 48;
     c = (c>48)?(c-32): c;
@@ -130,7 +121,7 @@ _hex2bin(int c) {
 }
 
 ///digest hex representation
-inline static void
+static inline void
 hex2out(const unsigned char* buff, size_t len){
     for (int i = 0; i < len; i++) {
         printf("%02x", buff[i]);
@@ -145,8 +136,8 @@ struct thread_info {
 struct task {
     _Alignas(64) gost2012_hash_ctx   ctx;
     unsigned char       digest[64];
-    unsigned int      digest_size;
-    atomic_uint       result;
+    unsigned int        digest_size;
+    atomic_uint         result;
     //filename buffer
     char*               filename;
     size_t              fcapacity;
@@ -170,23 +161,21 @@ task_free(task_t* task){
     }
 }
 
-inline static result_t
+static inline result_t
 task_get_result(task_t* task){
     return atomic_load_explicit(&(task->result), memory_order_acquire);
 }
 
-inline static void
+static inline void
 task_release(task_t* task){
-    /* !RES_INIT not using in syncronization so can use relaxed memory order */
+    /* !RES_INIT not using for synchronizations, so it can use relaxed memory order */
     atomic_store_explicit(&(task->result), RES_INIT, memory_order_relaxed ); 
 }
 
 ///Output file digest check status 
 static void
 task_print_status(const task_t* task, result_t res ){
-    if(task==NULL || task->filename==NULL){
-        return;
-    }
+    assert(task!=NULL && task->filename!=NULL);
     printf("%s - %s\n", task->filename, ( res==RES_HEQU )?"OK":"ERROR" );
 }
 
@@ -205,7 +194,7 @@ task_hex2digest(task_t* task, int shift, const char *str){
     return true;
 }
 ///Compare actual and calculated digests
-inline static _Bool
+static inline _Bool
 task_cmpdigest(const task_t* task, unsigned const char* actual){
     return memcmp(task->digest, actual, task->digest_size)==0;
 }
@@ -252,9 +241,7 @@ err:
     return res;
 }
 
-
-
-inline static result_t
+static inline result_t
 task_validate(task_t* task){
     unsigned char actual[64]; 
     int s = task_getdigest(task, actual);
@@ -274,13 +261,13 @@ struct master_context {
     pthread_cond_t          cv_master;
     //workers wait for new tasks
     pthread_cond_t          cv_worker;  
-    atomic_uint           await;
+    atomic_uint             await;
 };
+
 typedef struct master_context master_context_t;
 
-static void
+static inline void
 master_context_init(master_context_t *mi){
-    int s;
     mi->stop=0;
     
     for(int i=0;i<TASK_QUEUE_SIZE; i++){
@@ -303,7 +290,7 @@ master_context_free(master_context_t *mi){
     pthread_mutex_destroy(&(mi->mutex));
 }
 
-inline static void
+static inline void
 master_context_stop(master_context_t *mi){
     /* We can set stop status without mutex syncronization. I'm not sure. */
     //pthread_mutex_lock(&mi->mutex);
@@ -312,7 +299,7 @@ master_context_stop(master_context_t *mi){
     //pthread_mutex_unlock(&mi->mutex);
 }
  
-inline static _Bool
+static inline _Bool
 master_context_has_complete(master_context_t *mi){
     result_t task_result;
     
@@ -325,7 +312,7 @@ master_context_has_complete(master_context_t *mi){
     return false;
 } 
 ///Wait for accomplished task 
-static void 
+static inline void 
 master_context_master_wait(master_context_t *mi){
     pthread_mutex_lock(&mi->mutex);
     if(!master_context_has_complete(mi) )
@@ -335,7 +322,7 @@ master_context_master_wait(master_context_t *mi){
 } 
 
 ///Wait for submitted task
-static unsigned int 
+static inline unsigned int 
 master_context_worker_wait(master_context_t *mi){
     pthread_mutex_lock(&mi->mutex);
     unsigned int await;
@@ -346,7 +333,7 @@ master_context_worker_wait(master_context_t *mi){
     return await;
 } 
 ///Notify worker thread about new task 
-static void 
+static inline void 
 master_context_signal_master(master_context_t *mi){
     pthread_mutex_lock(&mi->mutex);
     atomic_fetch_add_explicit(&(mi->await), 1, memory_order_release ); 
@@ -393,7 +380,7 @@ thread_start(void *arg)
                   - break loop
                   - continue loop; 
                 */
-                i=0; //reset loop and try catch new task
+                i=0; //reset loop and catch new task
                 await = atomic_load_explicit(&mi->await, memory_order_consume);
             }
         }  
@@ -404,7 +391,7 @@ thread_start(void *arg)
     return (void*)done;
 }
 ///Submit new digest verify task or execute it inplace if the async parameter is NULL
-inline static int
+static inline int
 submit_task(task_t *task, master_context_t* async){
     if(async==NULL){
         atomic_store_explicit(&task->result, task_validate(task) , memory_order_release );
@@ -418,7 +405,7 @@ submit_task(task_t *task, master_context_t* async){
     return TASK_RES_ASYNC;
 }
 ///Read trailing line as filename
-inline static int
+static inline int
 read_filename(task_t *ptask, FILE* f){
     size_t r, r1, r2;
     size_t sh = 0;
@@ -481,17 +468,14 @@ static int
 check(const char* filename){
     master_context_t mi;
     master_context_t* async_context = &mi;
-    
     struct thread_info *tinfo=NULL;
-    pthread_attr_t attr;
     result_t  task_result;
-
     char buff[64];
     int s;
     int res = S_OK;
     size_t r;
     FILE *f;
-    int num_threads=2;
+    int num_threads=MIN_THREAD_COUNT;
     unsigned long ln;
     
     f= fopen(filename, "r");
@@ -502,11 +486,13 @@ check(const char* filename){
     fseek(f , 0 , SEEK_END);                          
     r = ftell(f); 
     fseek(f , 0 , SEEK_SET); 
+	
     if(r< MIN_CHECK_FILE_SIZE || flag_noasync){
         async_context = NULL;
     }
     
     if(async_context){
+        pthread_attr_t attr;
         master_context_init(&mi);
         
         s = pthread_attr_init(&attr);
@@ -515,14 +501,13 @@ check(const char* filename){
         //some heuristics to figure out optimum number of worker threads
         num_threads = get_ncpu();
         if(num_threads<=0){
-            num_threads = 2;
-        }else if(num_threads>6){
-            num_threads=6;
+            num_threads = MIN_THREAD_COUNT;
+        }else if(num_threads>MAX_THREAD_COUNT){
+            num_threads=MAX_THREAD_COUNT;
         }
     
         tinfo = calloc(num_threads, sizeof(struct thread_info));
-        if (tinfo == NULL)
-            handle_error("calloc");
+        if (tinfo == NULL) handle_error("calloc");
         
         //create  thread pool
         for (int tnum = 0; tnum < num_threads; tnum++) {
@@ -531,10 +516,10 @@ check(const char* filename){
         }
         test_error( pthread_attr_destroy(&attr), "pthread_attr_destroy" );
     }
-    //check file line number
+    //check-file line number
     ln = 1;
-    //system call status code
-    s =  0;
+    //function call status code
+    s = 0;
     /*just initialized tasks queue has only free blocks.
     Take last block for instance */
     task_t*  ptask = &(mi.tasks[TASK_QUEUE_SIZE-1]);
@@ -591,6 +576,7 @@ check(const char* filename){
             res = S_ERR_FORMAT; 
             break;
         }
+        
         char c = fgetc(f);
         if(c!=' '){
             //probably long hash format
@@ -684,15 +670,16 @@ check(const char* filename){
 static int  
 printusage(const char* executable){
     fputs( "calculates GOST R 34.11-2012 hash function\n\n", stderr);
-    fprintf(stderr, "%s [-hvl][-c checkfile|filename|-]\n", executable);	
-	fputs("\t-c check message digests (default is generate)\n"
+    fprintf(stderr, "%s [-nhvl][-c checkfile|filename [filename...]|-]\n", executable);  
+    fputs("\t-c check message digests (default is generate)\n"
             "\t-v verbose, print file names when checking\n"
             "\t-l use 512 bit hash (default 256 bit)\n"
             "\t-h print this help\n"
-			"\t - use stdin to calculate hash\n"
+            "\t-n no asynchronous digest. calculate hash digest in one thread\n"
+            "\t - use stdin to calculate hash\n"
             "The input for -c should be the list of message digests and file names\n"
             "that is printed on stdout by this program when it generates digests.\n", stderr);
-			
+            
     return 1;
 }
 
@@ -707,7 +694,6 @@ main (int argc, char *argv[]){
             case 'v': flag_verbose=true; break;
             case 'V': flag_statistics=true; break;
             case 'l': flag_longhash=true; break;
-            case 'x': flag_stdin=true; break;
             case 'c': check_filename = optarg; break;
             case '?': 
             case 'h': return printusage(argv[0]); break;
@@ -718,34 +704,45 @@ main (int argc, char *argv[]){
     };
     
     if(check_filename){
-        return check(check_filename);
-    }else if (argv[optind] !=NULL  || flag_stdin){
-        unsigned char actual[64];
-        
+        if(argv[optind] !=NULL)
+            res = printusage(argv[0]);
+        else
+            res = check(check_filename);
+    }else if (argv[optind] !=NULL){
+        unsigned char actual[64];    
         task_t  t;
-        task_init(&t);
-        
-        if( strcmp(argv[optind], "-") ==0 ){
-            flag_stdin = true;
-        }else{
-            t.filename = argv[optind];
-        }
-        
+		task_init(&t);
+       
         t.digest_size = flag_longhash?64:32;
-        res = task_getdigest(&t, actual);    
-        task_free(&t);
-        if(res==S_OK){
-            hex2out(actual,t.digest_size );
-            if(flag_verbose){
-                printf(" %s\n",argv[optind]);
+        
+        while(argv[optind] !=NULL){
+            
+            if( strcmp(argv[optind], "-") ==0 ){
+                t.filename = NULL;
             }else{
-                puts("");
+                t.filename = argv[optind];
             }
+            
+            res = task_getdigest(&t, actual);    
+            
+            if(res==S_OK){
+                hex2out(actual,t.digest_size );
+                if(flag_verbose){
+                    printf(" %s\n",argv[optind]);
+                }else{
+                    puts("");
+                }
+            }else{
+                break;
+            }
+            optind++;
+			task_release(&t);
         }
-        return res;
+        
+        task_free(&t);
 
     }else{
-        return printusage(argv[0]);
+        res = printusage(argv[0]);
     }
     
     return res;
