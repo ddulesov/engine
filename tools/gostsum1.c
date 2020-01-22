@@ -255,7 +255,7 @@ task_validate(task_t* task){
 struct master_context {
     //task slots
     task_t     tasks[ TASK_QUEUE_SIZE ];
-    unsigned int            stop;
+    atomic_uint             stop;
     pthread_mutex_t         mutex;
     //master wait for free task slot
     pthread_cond_t          cv_master;
@@ -268,13 +268,13 @@ typedef struct master_context master_context_t;
 
 static inline void
 master_context_init(master_context_t *mi){
-    mi->stop=0;
+	atomic_store_explicit(&(mi->stop), 0, memory_order_relaxed );
     
     for(int i=0;i<TASK_QUEUE_SIZE; i++){
         task_init( &(mi->tasks[i]) );
     };
     
-    atomic_store_explicit(&(mi->await), 0, memory_order_release );
+    atomic_store_explicit(&(mi->await), 0, memory_order_relaxed );
     test_error( pthread_mutex_init(&mi->mutex,NULL), "pthread_mutex_init" );
     test_error( pthread_cond_init(&mi->cv_master, NULL), "pthread_cond_init" );// = PTHREAD_COND_INITIALIZER;
     test_error( pthread_cond_init(&mi->cv_worker, NULL), "pthread_cond_init");// = PTHREAD_COND_INITIALIZER;
@@ -292,11 +292,15 @@ master_context_free(master_context_t *mi){
 
 static inline void
 master_context_stop(master_context_t *mi){
-    /* We can set stop status without mutex syncronization. I'm not sure. */
-    //pthread_mutex_lock(&mi->mutex);
-    mi->stop = 1;
+    /* We can set stop status without mutex syncronization with release memory order.  
+	   I don't know why ThreadSanitizer detect this condition as data race
+	*/
+    pthread_mutex_lock(&mi->mutex);
+	
+	atomic_store_explicit(&(mi->stop), 1, memory_order_relaxed );
+    
     pthread_cond_broadcast(&mi->cv_worker);
-    //pthread_mutex_unlock(&mi->mutex);
+    pthread_mutex_unlock(&mi->mutex);
 }
  
 static inline _Bool
@@ -323,20 +327,22 @@ master_context_master_wait(master_context_t *mi){
 
 ///Wait for submitted task
 static inline unsigned int 
-master_context_worker_wait(master_context_t *mi){
+master_context_worker_wait(master_context_t *mi, _Bool* flag_stop){
     pthread_mutex_lock(&mi->mutex);
     unsigned int await;
-    while((await = atomic_load_explicit(&mi->await, memory_order_consume))==0 && mi->stop==0  )
+	unsigned int stop = 0;
+    while((await = atomic_load_explicit(&mi->await, memory_order_consume))==0 && (stop=atomic_load_explicit(&mi->stop, memory_order_relaxed))==0  )
         pthread_cond_wait(&mi->cv_worker, &mi->mutex);
     
     pthread_mutex_unlock(&mi->mutex);
+	*flag_stop = (stop==1); 
     return await;
 } 
 ///Notify worker thread about new task 
 static inline void 
 master_context_signal_master(master_context_t *mi){
     pthread_mutex_lock(&mi->mutex);
-    atomic_fetch_add_explicit(&(mi->await), 1, memory_order_release ); 
+    atomic_fetch_add_explicit(&(mi->await), 1, memory_order_relaxed ); 
     pthread_cond_signal(&mi->cv_worker);
     pthread_mutex_unlock(&mi->mutex);
 }
@@ -350,6 +356,7 @@ thread_start(void *arg)
     long done = 0;
     //the number of submitted task that are not taken by worker threads
     unsigned int await = 0;
+	_Bool stop = false;
     result_t task_result;
     
     do{
@@ -362,7 +369,7 @@ thread_start(void *arg)
                 && atomic_compare_exchange_weak_explicit(&(ptask->result),
                 &task_result, 
                 RES_TAKE,
-                memory_order_release, memory_order_relaxed)  
+                memory_order_acq_rel, memory_order_relaxed)  
                 ){
                 //notify other worker we take the task
                 atomic_fetch_sub_explicit(&(mi->await), 1, memory_order_release ); 
@@ -374,6 +381,7 @@ thread_start(void *arg)
                 atomic_store_explicit(&ptask->result, task_result, memory_order_release );
                 
                 pthread_cond_signal(&mi->cv_master);
+				await = atomic_load_explicit(&mi->await, memory_order_consume);
                 pthread_mutex_unlock(&mi->mutex);
                 
                 /*another strategies are 
@@ -381,12 +389,12 @@ thread_start(void *arg)
                   - continue loop; 
                 */
                 i=0; //reset loop and catch new task
-                await = atomic_load_explicit(&mi->await, memory_order_consume);
+                
             }
         }  
         //put worker thread in sleep if no any submitted task 
-        await = master_context_worker_wait(mi);
-    }while(mi->stop==0 && await>0 );
+        await = master_context_worker_wait(mi, &stop);	
+    }while(!stop || await>0 );
     
     return (void*)done;
 }
@@ -394,7 +402,7 @@ thread_start(void *arg)
 static inline int
 submit_task(task_t *task, master_context_t* async){
     if(async==NULL){
-        atomic_store_explicit(&task->result, task_validate(task) , memory_order_release );
+        atomic_store_explicit(&task->result, task_validate(task) , memory_order_relaxed );
         return TASK_RES_OK; // sync call 
     }
     //async call

@@ -33,13 +33,13 @@ ELSEIF(CMAKE_C_COMPILER_ID MATCHES "MSVC")
  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
  add_definitions(-D_CRT_DEPRECATED_NO_WARNINGS)
  add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
- add_compile_options(/MP /WX /W4 /wd4100 /wd4267 /wd4706  /TC)
+ add_compile_options(/MP /WX /W4 /wd4100 /wd4267 /wd4706)
 ENDIF()
 
 cmake_host_system_information(RESULT  CPU_HAS_SSE2 QUERY HAS_SSE2)
 
 IF(CPU_HAS_SSE2 AND NOT NO_SIMD)
- message("build SSE2 optimized library. Add  NO_SIMD parameter to turn SSE off")
+ message("build SSE2 optimized library. Provide  NO_SIMD parameter to turn SSE off")
  add_definitions(-DENABLE_SIMD)
  IF(GCC_COMPATIBLE_COMPILER)
   #ensure compiler turn SIMD flags and intrinsics on
@@ -51,7 +51,7 @@ IF(CPU_HAS_SSE2 AND NOT NO_SIMD)
   #uncomment one of the next line to build GOST Engine boosted by SSE/AVX 
   
   #add_compile_options(/arch:AVX512)
-  add_compile_options(/arch:AVX2)
+  #add_compile_options(/arch:AVX2)
   #add_compile_options(/arch:AVX)
   #add_compile_options(/arch:SSE2)
   
@@ -61,6 +61,11 @@ ENDIF()
 if(ASAN)
  message(STATUS "address sanitizer enabled")
  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -g3 -fno-omit-frame-pointer")
+endif()
+
+if(TSAN)
+ message(STATUS "thread sanitizer enabled")
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread -g3")
 endif()
 
 set(CMAKE_C_STANDARD 11)
