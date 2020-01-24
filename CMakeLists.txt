@@ -101,22 +101,22 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
 # Remove when https://gitlab.kitware.com/cmake/cmake/issues/18525 is addressed
 set(OPENSSL_ENGINES_DIR "" CACHE PATH "OpenSSL Engines Directory")
 if ("${OPENSSL_ENGINES_DIR}" STREQUAL "")
-	include(FindPkgConfig)
-	pkg_get_variable(OPENSSL_ENGINES_DIR libcrypto enginesdir)
-	if ("${OPENSSL_ENGINES_DIR}" STREQUAL "")
-		message( FATAL_ERROR "Unable to discover the OpenSSL engines directory. Provide the path using -DOPENSSL_ENGINES_DIR" )
-	endif()
+    include(FindPkgConfig)
+    pkg_get_variable(OPENSSL_ENGINES_DIR libcrypto enginesdir)
+    if ("${OPENSSL_ENGINES_DIR}" STREQUAL "")
+        message( FATAL_ERROR "Unable to discover the OpenSSL engines directory. Provide the path using -DOPENSSL_ENGINES_DIR" )
+    endif()
 endif()
 
 set(GOST_89_SOURCE_FILES
         gost89.c
         gost89.h
-        )
+    )
 
 set(GOST_HASH_SOURCE_FILES
         gosthash.c
         gosthash.h
-        )
+    )
 
 set(GOST_HASH_2012_SOURCE_FILES
         gosthash2012.c
@@ -125,7 +125,7 @@ set(GOST_HASH_2012_SOURCE_FILES
         gosthash2012_precalc.h
         gosthash2012_ref.h
         gosthash2012_sse2.h
-        )
+    )
 
 set(GOST_GRASSHOPPER_SOURCE_FILES
         gost_grasshopper.h
@@ -138,7 +138,7 @@ set(GOST_GRASSHOPPER_SOURCE_FILES
         gost_grasshopper_precompiled.c
         gost_grasshopper_cipher.h
         gost_grasshopper_cipher.c
-        )
+    )
 
 set(GOST_CORE_SOURCE_FILES
         e_gost_err.c
@@ -152,27 +152,27 @@ set(GOST_CORE_SOURCE_FILES
         gost_lcl.h
         gost_params.c
         gost_keyexpimp.c
-        )
+    )
 
 set(GOST_EC_SOURCE_FILES
         gost_ec_keyx.c
         gost_ec_sign.c
-        )
+    )
 
 set (GOST_OMAC_SOURCE_FILES
         gost_omac.c
         gost_omac_acpkm.c
-        )
+    )
 
 set(GOST_LIB_SOURCE_FILES
-		${GOST_CORE_SOURCE_FILES}
+        ${GOST_CORE_SOURCE_FILES}
         ${GOST_89_SOURCE_FILES}
         ${GOST_HASH_SOURCE_FILES}
         ${GOST_HASH_2012_SOURCE_FILES}
         ${GOST_GRASSHOPPER_SOURCE_FILES}
         ${GOST_EC_SOURCE_FILES}
         ${GOST_OMAC_SOURCE_FILES}
-        )
+    )
 
 set(GOST_ENGINE_SOURCE_FILES
         ${GOST_CORE_SOURCE_FILES}
@@ -182,35 +182,35 @@ set(GOST_ENGINE_SOURCE_FILES
         gost_pmeth.c
         gost_omac.c
         gost_omac_acpkm.c
-        )
+    )
 
 #tests
 add_executable(test_digest test_digest.c ansi_terminal.c)
 target_link_libraries(test_digest gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME digest
-	COMMAND test_digest)
+    COMMAND test_digest)
 
 add_executable(test_curves test_curves.c ansi_terminal.c)
 target_link_libraries(test_curves gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME curves
-	COMMAND test_curves)
+    COMMAND test_curves)
 
 add_executable(test_params test_params.c ansi_terminal.c)
 target_link_libraries(test_params gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME parameters
-	COMMAND test_params)
+    COMMAND test_params)
 
 add_executable(test_sign test_sign.c ansi_terminal.c)
 target_link_libraries(test_sign gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME sign/verify
-	COMMAND test_sign)
+    COMMAND test_sign)
 
 IF(NOT MSVC)
 
 add_executable(test_tls test_tls.c ansi_terminal.c)
 target_link_libraries(test_tls gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
 add_test(NAME TLS
-	COMMAND test_tls)
+    COMMAND test_tls)
 ELSE()
 message(WARNING  "test_tls build is skipped. Windows platform doesn't support some POSIX API ")
 ENDIF()
@@ -218,36 +218,36 @@ ENDIF()
 add_executable(test_context test_context.c ansi_terminal.c)
 target_link_libraries(test_context gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME context
-	COMMAND test_context)
+    COMMAND test_context)
 
 add_executable(test_grasshopper test_grasshopper.c ansi_terminal.c)
 target_link_libraries(test_grasshopper gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME grasshopper
-	COMMAND test_grasshopper)
+    COMMAND test_grasshopper)
 
 add_executable(test_keyexpimp test_keyexpimp.c ansi_terminal.c)
 #target_compile_definitions(test_keyexpimp PUBLIC -DOPENSSL_LOAD_CONF)
 target_link_libraries(test_keyexpimp gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME keyexpimp
-	COMMAND test_keyexpimp)
+    COMMAND test_keyexpimp)
 
 add_executable(test_gost89 test_gost89.c)
 target_link_libraries(test_gost89 gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME gost89
-	COMMAND test_gost89)
+    COMMAND test_gost89)
 
 if(NOT ASAN)
 add_test(NAME engine
-	COMMAND perl run_tests
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test)
+    COMMAND perl run_tests
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test)
 set_tests_properties(engine PROPERTIES ENVIRONMENT
-	"OPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR};OPENSSL_ENGINES=${OUTPUT_DIRECTORY};OPENSSL_CONF=${CMAKE_SOURCE_DIR}/test/empty.cnf")
+    "OPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR};OPENSSL_ENGINES=${OUTPUT_DIRECTORY};OPENSSL_CONF=${CMAKE_SOURCE_DIR}/test/empty.cnf")
 endif()
 
 add_executable(test_tlstree test_tlstree.c)
 target_link_libraries(test_tlstree PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 add_test(NAME test_tlstree
-	COMMAND test_tlstree)
+    COMMAND test_tlstree)
 
 # All that may need to load just built engine will have path to it defined.
 set(BINARY_TESTS_TARGETS
@@ -259,8 +259,7 @@ set(BINARY_TESTS_TARGETS
         test_grasshopper
         test_keyexpimp
         test_gost89
-        
-    )
+)
 IF(NOT MSVC)
 list(APPEND BINARY_TESTS_TARGETS test_tls)
 ENDIF()
@@ -281,25 +280,26 @@ endif()
 
 #utilities
 set(GOST_SUM_SOURCE_FILES
-        gostsum.c
+    gostsum.c
 )
 
 add_executable(gostsum ${GOST_SUM_SOURCE_FILES})
 target_link_libraries(gostsum gost_core)
 
 set(GOST_12_SUM_SOURCE_FILES
-        gost12sum.c
-		ansi_terminal.c
-		gosthash2012.c
-    )
+    gost12sum.c
+    ansi_terminal.c
+    gosthash2012.c
+)
 add_executable(gost12sum ${GOST_12_SUM_SOURCE_FILES})
 
 IF(NOT MSVC)
 set(GOST_1_SUM_SOURCE_FILES
-        tools/gostsum1.c
-		ansi_terminal.c
-		gosthash2012.c
-    )
+    tools/gostsum1.c
+    gosthash2012.c
+    gosthash.c
+    gost89.c
+)
 add_executable(gost1sum ${GOST_1_SUM_SOURCE_FILES})
 target_link_libraries(gost1sum pthread)
 ENDIF()
@@ -317,7 +317,7 @@ set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_target(tags
     COMMAND ctags -R . ${OPENSSL_ROOT_DIR}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-	
+    
 set(OPENSSL_MAN_INSTALL_DIR ${CMAKE_INSTALL_MANDIR}/man1)
 
 install(TARGETS gost_engine gostsum gost12sum EXPORT GostEngineConfig

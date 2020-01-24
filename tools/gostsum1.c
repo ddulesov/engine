@@ -46,11 +46,15 @@
 #include <limits.h>
 
 #include "../gosthash2012.h"
+#include "../gosthash.h"
+
+typedef enum hashtype { GOST2012_256, GOST2012_512, GOST89_A, GOST89_T } hashtype_t;
 
 static _Bool flag_noasync    = false;
 static _Bool flag_verbose    = false;
-static _Bool flag_longhash   = false;
 static _Bool flag_statistics = false;
+
+static hashtype_t  htype = GOST2012_256;
 
 #define handle_error_en(en, msg) \
     do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -61,13 +65,13 @@ static _Bool flag_statistics = false;
 #define test_error( f, msg ) \
     do { int _s = f; if(_s!=0){ errno=_s; perror(msg); exit(EXIT_FAILURE); } } while (0)
                
-#define RES_INIT    0x0000
-#define RES_SUBM    0x0001
-#define RES_TAKE    0x0002
-#define RES_HEQU    0xFF00
-#define RES_HDIFF   0xFF01
-#define RES_EFILE   0xFF02
-#define RES_COMP_MASK  0xFF00
+#define RES_INIT            0x0000
+#define RES_SUBM            0x0001
+#define RES_TAKE            0x0002
+#define RES_HEQU            0xFF00
+#define RES_HDIFF           0xFF01
+#define RES_EFILE           0xFF02
+#define RES_COMP_MASK       0xFF00
 
 #define IS_RESULT_OK(task_res)     (task_res == RES_HEQU)
 #define IS_RESULT_ERR(task_res)    (task_res != RES_HEQU)
@@ -76,18 +80,18 @@ static _Bool flag_statistics = false;
 #define MAX_THREAD_COUNT    8
 #define DEF_FNAME_LEN       256
 
-#define FILE_READ_BUF_SIZE  (1024 * 8)
-#define THREAD_STACK_SIZE   (1024 * 16)
-#define MIN_CHECK_FILE_SIZE  4000
+#define FILE_READ_BUF_SIZE  (1024 * 16)
+#define THREAD_STACK_SIZE   (1024 * 64)
+#define MIN_CHECK_FILE_SIZE 4000
 
-#define TASK_RES_OK     0
-#define TASK_RES_ASYNC  1
+#define TASK_RES_OK         0
+#define TASK_RES_ASYNC      1
 
-#define S_OK            0
-#define S_ERR_HASH      1
-#define S_ERR_FORMAT    2
-#define S_ERR_MEM       3
-#define S_ERR           4
+#define S_OK                0
+#define S_ERR_HASH          1
+#define S_ERR_FORMAT        2
+#define S_ERR_MEM           3
+#define S_ERR               4
 
 /* tweak async task parameters */
 #define TASK_QUEUE_SIZE     10  /* 4 .. 126 */
@@ -134,9 +138,7 @@ struct thread_info {
 };
 
 struct task {
-    _Alignas(64) gost2012_hash_ctx   ctx;
     unsigned char       digest[64];
-    unsigned int        digest_size;
     atomic_uint         result;
     //filename buffer
     char*               filename;
@@ -176,7 +178,7 @@ task_release(task_t* task){
 static void
 task_print_status(const task_t* task, result_t res ){
     assert(task!=NULL && task->filename!=NULL);
-    printf("%s - %s\n", task->filename, ( res==RES_HEQU )?"OK":"ERROR" );
+    printf("%s - %s\n", task->filename, ( res==RES_HEQU )? "OK" : "ERROR" );
 }
 
 static _Bool 
@@ -195,23 +197,53 @@ task_hex2digest(task_t* task, int shift, const char *str){
 }
 ///Compare actual and calculated digests
 static inline _Bool
-task_cmpdigest(const task_t* task, unsigned const char* actual){
-    return memcmp(task->digest, actual, task->digest_size)==0;
+task_cmpdigest(const task_t* task, hashtype_t htype, unsigned const char* actual){
+    
+    return memcmp(task->digest, actual, (htype == GOST2012_512)?64:32 )==0;
+}
+
+static inline void 
+task_getdigest_2012(task_t* task, hashtype_t htype, FILE* in, unsigned char* digest ){
+    _Alignas(64) gost2012_hash_ctx  ctx;
+    _Alignas(64) unsigned char buff[ FILE_READ_BUF_SIZE ];
+    size_t bytes;
+    init_gost2012_hash_ctx(&ctx, (htype == GOST2012_512)?512:256 );
+    
+    while ((bytes = fread(buff, 1, FILE_READ_BUF_SIZE, in)) > 0) {
+        gost2012_hash_block(&ctx, buff, bytes );
+    }
+        
+    gost2012_finish_hash(&ctx, digest);
+}
+
+static inline void 
+task_getdigest_89(task_t* task, hashtype_t htype, FILE* in, unsigned char* digest ){
+    _Alignas(64) gost_hash_ctx  ctx;
+    _Alignas(64) unsigned char buff[ FILE_READ_BUF_SIZE ];
+    size_t bytes;
+    const gost_subst_block *b = (htype == GOST89_A)? &GostR3411_94_CryptoProParamSet: &GostR3411_94_TestParamSet;
+    init_gost_hash_ctx(&ctx, b);
+    
+    while ((bytes = fread(buff, 1, FILE_READ_BUF_SIZE, in)) > 0) {
+        hash_block(&ctx,  buff, bytes);
+    }
+        
+    finish_hash(&ctx, buff);
+    for(int i=0;i<32;i++){
+        *digest++ = buff[31-i];
+    }
 }
 
 ///digest calculation routine based on libc file API 
 static int
-task_getdigest(task_t* task, unsigned char* digest){
-    
-    unsigned char buff[ FILE_READ_BUF_SIZE ];
-    size_t bytes;
+task_getdigest(task_t* task,  hashtype_t htype, unsigned char* digest){
     int res = S_OK;
     FILE *f;
     
     if(task==NULL)
         return S_ERR;
     
-    if(task->filename==NULL && task->fcapacity==0){
+    if(task->filename==NULL){
         f = stdin;
     }else{
         f = fopen(task->filename,"rb");
@@ -222,34 +254,29 @@ task_getdigest(task_t* task, unsigned char* digest){
         posix_fadvise(fileno(f), 0, 0, POSIX_FADV_SEQUENTIAL);
 #endif
     }
-
-    init_gost2012_hash_ctx(&task->ctx, (int) task->digest_size  * 8 );
+    if(htype == GOST2012_256 || htype == GOST2012_512 )
+        task_getdigest_2012(task, htype, f, digest);
+    else
+        task_getdigest_89(task, htype, f, digest);
     
-    while ((bytes = fread(buff, 1, FILE_READ_BUF_SIZE, f)) > 0) {
-        gost2012_hash_block(&task->ctx, buff, bytes );
-    }
     
     if (ferror(f)) {
-        res = S_ERR;
-        goto err;   
+        res = S_ERR;   
     }
-    
-    gost2012_finish_hash(&task->ctx, digest);
-err:
     if(f!=NULL && f!=stdin)
         fclose(f);
     return res;
 }
 
 static inline result_t
-task_validate(task_t* task){
+task_validate(task_t* task, hashtype_t htype){
     unsigned char actual[64]; 
-    int s = task_getdigest(task, actual);
+    int s = task_getdigest(task, htype, actual);
     if(s != S_OK){
         return RES_EFILE;
     };
     
-    return task_cmpdigest(task, actual)? RES_HEQU: RES_HDIFF;
+    return task_cmpdigest(task, htype, actual)? RES_HEQU: RES_HDIFF;
 }
 
 struct master_context {
@@ -268,7 +295,7 @@ typedef struct master_context master_context_t;
 
 static inline void
 master_context_init(master_context_t *mi){
-	atomic_store_explicit(&(mi->stop), 0, memory_order_relaxed );
+    atomic_store_explicit(&(mi->stop), 0, memory_order_relaxed );
     
     for(int i=0;i<TASK_QUEUE_SIZE; i++){
         task_init( &(mi->tasks[i]) );
@@ -293,11 +320,11 @@ master_context_free(master_context_t *mi){
 static inline void
 master_context_stop(master_context_t *mi){
     /* We can set stop status without mutex syncronization with release memory order.  
-	   I don't know why ThreadSanitizer detect this condition as data race
-	*/
+       I don't know why ThreadSanitizer detect this condition as data race
+    */
     pthread_mutex_lock(&mi->mutex);
-	
-	atomic_store_explicit(&(mi->stop), 1, memory_order_relaxed );
+    
+    atomic_store_explicit(&(mi->stop), 1, memory_order_relaxed );
     
     pthread_cond_broadcast(&mi->cv_worker);
     pthread_mutex_unlock(&mi->mutex);
@@ -330,12 +357,12 @@ static inline unsigned int
 master_context_worker_wait(master_context_t *mi, _Bool* flag_stop){
     pthread_mutex_lock(&mi->mutex);
     unsigned int await;
-	unsigned int stop = 0;
-    while((await = atomic_load_explicit(&mi->await, memory_order_consume))==0 && (stop=atomic_load_explicit(&mi->stop, memory_order_relaxed))==0  )
+    unsigned int stop = 0;
+    while((await = atomic_load_explicit(&mi->await, memory_order_relaxed))==0 && (stop=atomic_load_explicit(&mi->stop, memory_order_relaxed))==0  )
         pthread_cond_wait(&mi->cv_worker, &mi->mutex);
     
     pthread_mutex_unlock(&mi->mutex);
-	*flag_stop = (stop==1); 
+    *flag_stop = (stop==1); 
     return await;
 } 
 ///Notify worker thread about new task 
@@ -349,14 +376,13 @@ master_context_signal_master(master_context_t *mi){
  
 ///Worker thread function
 static void *
-thread_start(void *arg)
-{
+thread_start(void *arg){
     master_context_t *mi = arg;
 
     long done = 0;
     //the number of submitted task that are not taken by worker threads
     unsigned int await = 0;
-	_Bool stop = false;
+    _Bool stop = false;
     result_t task_result;
     
     do{
@@ -372,16 +398,16 @@ thread_start(void *arg)
                 memory_order_acq_rel, memory_order_relaxed)  
                 ){
                 //notify other worker we take the task
-                atomic_fetch_sub_explicit(&(mi->await), 1, memory_order_release ); 
+                atomic_fetch_sub_explicit(&(mi->await), 1, memory_order_relaxed ); 
                 //do work
-                task_result = task_validate(ptask);
+                task_result = task_validate(ptask, htype);
                 //notify the master process that we are ready 
                 pthread_mutex_lock(&mi->mutex);
                 done++;
-                atomic_store_explicit(&ptask->result, task_result, memory_order_release );
+                atomic_store_explicit(&ptask->result, task_result, memory_order_release ); 
                 
                 pthread_cond_signal(&mi->cv_master);
-				await = atomic_load_explicit(&mi->await, memory_order_consume);
+                await = atomic_load_explicit(&mi->await, memory_order_relaxed);
                 pthread_mutex_unlock(&mi->mutex);
                 
                 /*another strategies are 
@@ -393,7 +419,7 @@ thread_start(void *arg)
             }
         }  
         //put worker thread in sleep if no any submitted task 
-        await = master_context_worker_wait(mi, &stop);	
+        await = master_context_worker_wait(mi, &stop);  
     }while(!stop || await>0 );
     
     return (void*)done;
@@ -402,7 +428,7 @@ thread_start(void *arg)
 static inline int
 submit_task(task_t *task, master_context_t* async){
     if(async==NULL){
-        atomic_store_explicit(&task->result, task_validate(task) , memory_order_relaxed );
+        atomic_store_explicit(&task->result, task_validate(task, htype) , memory_order_relaxed );
         return TASK_RES_OK; // sync call 
     }
     //async call
@@ -494,7 +520,7 @@ check(const char* filename){
     fseek(f , 0 , SEEK_END);                          
     r = ftell(f); 
     fseek(f , 0 , SEEK_SET); 
-	
+    
     if(r< MIN_CHECK_FILE_SIZE || flag_noasync){
         async_context = NULL;
     }
@@ -587,6 +613,11 @@ check(const char* filename){
         
         char c = fgetc(f);
         if(c!=' '){
+            if(htype != GOST2012_512){
+                res = S_ERR_FORMAT; 
+                break;              
+            }
+            
             //probably long hash format
             r = fread(&buff[1], 1, sizeof(buff)-1, f);
             if(r!=sizeof(buff)-1 ){
@@ -604,10 +635,10 @@ check(const char* filename){
                 break;
             };
             //long 512 bit hash used
-            ptask->digest_size = 64;
+            //ptask->digest_size = 64;
         }else{
             //reqular 256 bit hash used
-            ptask->digest_size = 32;
+            //ptask->digest_size = 32;
         }
 
         s = read_filename(ptask, f);
@@ -677,18 +708,33 @@ check(const char* filename){
 
 static int  
 printusage(const char* executable){
-    fputs( "calculates GOST R 34.11-2012 hash function\n\n", stderr);
-    fprintf(stderr, "%s [-nhvl][-c checkfile|filename [filename...]|-]\n", executable);  
+    fputs( "calculates GOST R 34.11-2012 and GOST 28147-89 hash functions\n\n", stderr);
+    fprintf(stderr, "%s [-nhvl] [-t g12|g12l|g89|g89a|g89t ] [-c check.file|filename [filename...]|-]\n", executable);  
     fputs("\t-c check message digests (default is generate)\n"
-            "\t-v verbose, print file names when checking\n"
-            "\t-l use 512 bit hash (default 256 bit)\n"
+            "\t-v verbose, print file names when checking and calculating hash digest\n"
+            "\t-t hash_type:\n"
+            "\t   g12  - (default) GOST 34.11-2012 (256)\n"
+            "\t   g12l - GOST 34.11-2012 (512)\n"
+            "\t   g89 or g89a - GOST 28147-89 (A-Paramset)\n"
+            "\t   g89t - GOST 28147-89 (Test-Paramset)\n"
+            "\t-l (for backward compatibility) use 512 bit GOST 34.11-2012 hash (default 256 bit)\n"
             "\t-h print this help\n"
-            "\t-n no asynchronous digest. calculate hash digest in one thread\n"
-            "\t - use stdin to calculate hash\n"
+            "\t-n no asynchronous multithreading processing. calculate hash digest in one thread\n"
+            "\t - use standard input to calculate hash\n"
             "The input for -c should be the list of message digests and file names\n"
             "that is printed on stdout by this program when it generates digests.\n", stderr);
+    fputs("examples:\n  calculate\n", stderr);
+	fprintf(stderr,"\t%s -v filename [filename] ... > check.file\n  validate\n", executable);
+    fprintf(stderr,"\t%s -c check.file\n", executable);
+	fputs("returns 0 on success, >0 on error \n", stderr);
             
     return 1;
+}
+
+static int
+error_htype(const char* executable, const char* htype){
+    fprintf(stderr, "incorrect hash type supplied %s \n",htype);
+    return printusage(executable);
 }
 
 int 
@@ -696,13 +742,38 @@ main (int argc, char *argv[]){
     int res = 0;
     const char* check_filename=NULL;
 
-    while ( (res = getopt(argc,argv,"nhxlvVc:") ) != -1){
+    while ( (res = getopt(argc,argv,"nhxlvVt:c:") ) != -1){
         switch (res){    
             case 'n': flag_noasync=true; break;
             case 'v': flag_verbose=true; break;
             case 'V': flag_statistics=true; break;
-            case 'l': flag_longhash=true; break;
+            case 'l': htype=GOST2012_512; break;
             case 'c': check_filename = optarg; break;
+            case 't': 
+                /* parse hash type */
+                if(strncmp(optarg, "g89",3)==0 ){
+                    if( optarg[3]=='\0' ||  optarg[3]=='a' ){
+                        htype = GOST89_A;
+                    }else if(optarg[3]=='t') {
+                        htype = GOST89_T; 
+                    }else{
+                        return error_htype(argv[0], optarg); 
+                    }
+                    
+                }else if(strncmp(optarg, "g12",3)==0 ){
+                    if( optarg[3]=='\0'  ){
+                        htype = GOST2012_256;
+                    }else if(optarg[3]=='l') {
+                        htype = GOST2012_512; 
+                    }else{
+                        return error_htype(argv[0], optarg); 
+                    }                   
+                }else{
+                    return error_htype(argv[0], optarg); 
+                }
+                
+            
+                break;
             case '?': 
             case 'h': return printusage(argv[0]); break;
             default: 
@@ -719,9 +790,9 @@ main (int argc, char *argv[]){
     }else if (argv[optind] !=NULL){
         unsigned char actual[64];    
         task_t  t;
-		task_init(&t);
-       
-        t.digest_size = flag_longhash?64:32;
+        task_init(&t);
+        
+        size_t digest_size = (htype == GOST2012_512)?64:32;
         
         while(argv[optind] !=NULL){
             
@@ -731,10 +802,10 @@ main (int argc, char *argv[]){
                 t.filename = argv[optind];
             }
             
-            res = task_getdigest(&t, actual);    
+            res = task_getdigest(&t, htype, actual);    
             
             if(res==S_OK){
-                hex2out(actual,t.digest_size );
+                hex2out(actual, digest_size );
                 if(flag_verbose){
                     printf(" %s\n",argv[optind]);
                 }else{
@@ -744,7 +815,7 @@ main (int argc, char *argv[]){
                 break;
             }
             optind++;
-			task_release(&t);
+            task_release(&t);
         }
         
         task_free(&t);
