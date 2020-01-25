@@ -22,6 +22,8 @@ open STDERR, ">>","tests.err";
 if (exists $ENV{'OPENSSL_CONF'}) {
 	delete $ENV{'OPENSSL_CONF'}
 }
+
+
 #
 # This test needs output of openssl engine -c command.
 # Default one  is hardcoded below, but you can place file
@@ -52,18 +54,6 @@ is(`openssl dgst -engine $engine -md_gost94 testdata.dat`,
 "compute digest without config");
 
 
-open $F,">","test.cnf";
-print $F <<EOCFG;
-openssl_conf = openssl_def
-[openssl_def]
-engines = engines
-[engines]
-${engine}=gost_conf
-[gost_conf]
-default_algorithms = ALL
-
-EOCFG
-close $F;
 $ENV{'OPENSSL_CONF'}=abs_path('test.cnf');
 
 is(`openssl engine -c $engine`,
@@ -83,4 +73,4 @@ like(`openssl ciphers`, qr|GOST2001-GOST89-GOST89|, 'display GOST2001-GOST89-GOS
 like(`openssl ciphers`, qr|GOST2012-GOST8912-GOST8912|, 'display GOST2012-GOST8912-GOST8912 cipher');
 
 unlink('testdata.dat');
-unlink('test.cnf');
+

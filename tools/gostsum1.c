@@ -64,7 +64,9 @@ static hashtype_t  htype = GOST2012_256;
 
 #define test_error( f, msg ) \
     do { int _s = f; if(_s!=0){ errno=_s; perror(msg); exit(EXIT_FAILURE); } } while (0)
-               
+         
+#define MIN(a,b) (((a)<(b))?(a):(b))
+	 
 #define RES_INIT            0x0000
 #define RES_SUBM            0x0001
 #define RES_TAKE            0x0002
@@ -81,7 +83,11 @@ static hashtype_t  htype = GOST2012_256;
 #define DEF_FNAME_LEN       256
 
 #define FILE_READ_BUF_SIZE  (1024 * 16)
-#define THREAD_STACK_SIZE   (1024 * 64)
+#if defined(__arm__) || defined(__aarch64__)
+#define THREAD_STACK_SIZE   (1024 * 256)
+#else
+#define THREAD_STACK_SIZE   (1024 * 32)
+#endif
 #define MIN_CHECK_FILE_SIZE 4000
 
 #define TASK_RES_OK         0
@@ -530,7 +536,7 @@ check(const char* filename){
         master_context_init(&mi);
         
         s = pthread_attr_init(&attr);
-        test_error( pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE), "pthread_attr_setstacksize" );
+        test_error( pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE  ), "pthread_attr_setstacksize" );
         
         //some heuristics to figure out optimum number of worker threads
         num_threads = get_ncpu();

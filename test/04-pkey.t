@@ -20,24 +20,13 @@ open STDERR, ">>","tests.err";
 my $F;
 my $eng_param;
 
-open $F,">","test.cnf";
+
 if (defined($use_config) && $use_config) {
 	$eng_param = "";
-	open $F,">","test.cnf";
-	print $F <<EOCFG;
-openssl_conf = openssl_def
-[openssl_def]
-engines = engines
-[engines]
-${engine}=gost_conf
-[gost_conf]
-default_algorithms = ALL
-
-EOCFG
 } else {
 	$eng_param = "-engine $engine"
 }
-close $F;
+
 $ENV{'OPENSSL_CONF'}=abs_path('test.cnf');
 
 
@@ -157,5 +146,4 @@ unlink "tmp.pem";
 
 # 11. Сгенерирвоать encrypted key и его разобрать.
 
-unlink "test.cnf";
 

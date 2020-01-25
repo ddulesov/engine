@@ -33,24 +33,13 @@ our $count=0;
 my $F;
 my $eng_param;
 
-open $F,">","test.cnf";
+
 if (defined($use_config) && $use_config) {
 	$eng_param = "";
-	open $F,">","test.cnf";
-	print $F <<EOCFG
-openssl_conf = openssl_def
-[openssl_def]
-engines = engines
-[engines]
-${engine}=gost_conf
-[gost_conf]
-default_algorithms = ALL
-
-EOCFG
 } else {
 	$eng_param = "-engine $engine"
 }
-close $F;
+
 $ENV{'OPENSSL_CONF'}=abs_path('test.cnf');
 	
 sub crypt_test {
@@ -155,4 +144,3 @@ crypt_test(-paramset=> "1.2.643.2.2.31.4", -key => $key, -iv => $iv,
 		   -alg => 'gost89-cbc',
 		   -name=> 'CBC short text, paramset D');
 
-unlink "test.cnf";

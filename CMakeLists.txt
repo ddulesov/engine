@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(gost-engine LANGUAGES C)
 
 include(GNUInstallDirs)
@@ -39,7 +39,7 @@ ENDIF()
 cmake_host_system_information(RESULT  CPU_HAS_SSE2 QUERY HAS_SSE2)
 
 IF(CPU_HAS_SSE2 AND NOT NO_SIMD)
- message("build SSE2 optimized library. Provide  NO_SIMD parameter to turn SSE off")
+ message("build SSE2 optimized library. Provide NO_SIMD parameter to turn SSE off")
  add_definitions(-DENABLE_SIMD)
  IF(GCC_COMPATIBLE_COMPILER)
   #ensure compiler turn SIMD flags and intrinsics on
@@ -61,11 +61,6 @@ ENDIF()
 if(ASAN)
  message(STATUS "address sanitizer enabled")
  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -g3 -fno-omit-frame-pointer")
-endif()
-
-if(TSAN)
- message(STATUS "thread sanitizer enabled")
- set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread -g3")
 endif()
 
 set(CMAKE_C_STANDARD 11)
@@ -184,6 +179,20 @@ set(GOST_ENGINE_SOURCE_FILES
         gost_omac_acpkm.c
     )
 
+
+
+#core library
+add_library(gost_core STATIC ${GOST_LIB_SOURCE_FILES})
+set_target_properties(gost_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+add_library(gost_engine SHARED ${GOST_ENGINE_SOURCE_FILES})
+set_target_properties(gost_engine PROPERTIES PREFIX "" OUTPUT_NAME "gost")
+set_target_properties(gost_engine PROPERTIES VERSION ${GOST_SOVERSION} SOVERSION ${GOST_SOVERSION})
+target_link_libraries(gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
+if(WIN32)
+  target_link_libraries(gost_engine wsock32 ws2_32)
+endif()
+
 #tests
 add_executable(test_digest test_digest.c ansi_terminal.c)
 target_link_libraries(test_digest gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
@@ -237,10 +246,11 @@ add_test(NAME gost89
     COMMAND test_gost89)
 
 if(NOT ASAN)
-add_test(NAME engine
+    add_test(NAME engine
     COMMAND perl run_tests
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/test)
-set_tests_properties(engine PROPERTIES ENVIRONMENT
+	
+	set_tests_properties(engine PROPERTIES ENVIRONMENT
     "OPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR};OPENSSL_ENGINES=${OUTPUT_DIRECTORY};OPENSSL_CONF=${CMAKE_SOURCE_DIR}/test/empty.cnf")
 endif()
 
@@ -260,23 +270,12 @@ set(BINARY_TESTS_TARGETS
         test_keyexpimp
         test_gost89
 )
+
 IF(NOT MSVC)
 list(APPEND BINARY_TESTS_TARGETS test_tls)
 ENDIF()
 
 set_property(TARGET ${BINARY_TESTS_TARGETS} APPEND PROPERTY COMPILE_DEFINITIONS ENGINE_DIR="${OUTPUT_DIRECTORY}")
-
-#core library
-add_library(gost_core STATIC ${GOST_LIB_SOURCE_FILES})
-set_target_properties(gost_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-add_library(gost_engine SHARED ${GOST_ENGINE_SOURCE_FILES})
-set_target_properties(gost_engine PROPERTIES PREFIX "" OUTPUT_NAME "gost")
-set_target_properties(gost_engine PROPERTIES VERSION ${GOST_SOVERSION} SOVERSION ${GOST_SOVERSION})
-target_link_libraries(gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY})
-if(WIN32)
-  target_link_libraries(gost_engine wsock32 ws2_32)
-endif()
 
 #utilities
 set(GOST_SUM_SOURCE_FILES
@@ -301,6 +300,12 @@ set(GOST_1_SUM_SOURCE_FILES
     gost89.c
 )
 add_executable(gost1sum ${GOST_1_SUM_SOURCE_FILES})
+if(TSAN)
+ message(STATUS "thread sanitizer enabled")
+ target_compile_options(gost1sum PRIVATE "-fsanitize=thread;-g3")
+ target_link_libraries(gost1sum  "-fsanitize=thread")
+endif()
+
 target_link_libraries(gost1sum pthread)
 ENDIF()
 

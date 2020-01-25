@@ -5,10 +5,10 @@ if(defined $ENV{'OPENSSL_ROOT_DIR'}) {
     my $openssl_libdir;
     my $openssl_bindir;
 
-    if (-d "$ENV{'OPENSSL_ROOT_DIR'}/apps") {
+    if (-d "$ENV{'OPENSSL_ROOT_DIR'}/lib") {
         # The OpenSSL root dir is an OpenSSL build tree
-        $openssl_bindir = "$ENV{'OPENSSL_ROOT_DIR'}/apps";
-        $openssl_libdir = "$ENV{'OPENSSL_ROOT_DIR'}";
+        $openssl_bindir = "$ENV{'OPENSSL_ROOT_DIR'}/bin";
+        $openssl_libdir = "$ENV{'OPENSSL_ROOT_DIR'}/lib";
     } else {
         # The OpenSSL root dir is an OpenSSL installation tree
         # Since we're not exactly sure what the library path is (because
@@ -47,4 +47,24 @@ if(defined $ENV{'OPENSSL_ROOT_DIR'}) {
 my $harness = TAP::Harness->new({
     verbosity => (($ENV{CTEST_INTERACTIVE_DEBUG_MODE} // 0) != 0)
 });
-exit ($harness->runtests(glob("*.t"))->all_passed() ? 0 : 1);
+
+#create config file
+my $engine=$ENV{'ENGINE_NAME'}||"gost";
+
+open $F,">","test.cnf";
+print $F <<EOCFG;
+openssl_conf = openssl_def
+[openssl_def]
+engines = engines
+[engines]
+${engine}=gost_conf
+[gost_conf]
+default_algorithms = ALL
+
+EOCFG
+close $F;
+
+my $res = $harness->runtests(glob("*.t"))->all_passed() ? 0 : 1;
+
+unlink('test.cnf');
+exit( $res );
