@@ -66,7 +66,7 @@ static hashtype_t  htype = GOST2012_256;
     do { int _s = f; if(_s!=0){ errno=_s; perror(msg); exit(EXIT_FAILURE); } } while (0)
          
 #define MIN(a,b) (((a)<(b))?(a):(b))
-	 
+     
 #define RES_INIT            0x0000
 #define RES_SUBM            0x0001
 #define RES_TAKE            0x0002
@@ -172,6 +172,11 @@ task_free(task_t* task){
 static inline result_t
 task_get_result(task_t* task){
     return atomic_load_explicit(&(task->result), memory_order_acquire);
+}
+
+static inline result_t
+task_read_result(task_t* task){
+    return atomic_load_explicit(&(task->result), memory_order_relaxed);
 }
 
 static inline void
@@ -395,7 +400,7 @@ thread_start(void *arg){
         //look for a submitted task
         for(int i=0;await>0 && i<TASK_QUEUE_SIZE; i++ ){
             task_t *ptask = &(mi->tasks[i]);
-            task_result = task_get_result( ptask );
+            task_result = task_read_result( ptask );
             
             if(RES_SUBM == task_result 
                 && atomic_compare_exchange_weak_explicit(&(ptask->result),
@@ -531,9 +536,14 @@ check(const char* filename){
         async_context = NULL;
     }
     
+    /*just initialized tasks queue has only free blocks.
+    Take last block for instance */
+    task_t*  ptask = &(mi.tasks[TASK_QUEUE_SIZE-1]);
+    
     if(async_context){
-        pthread_attr_t attr;
         master_context_init(&mi);
+        pthread_attr_t attr;
+        
         
         s = pthread_attr_init(&attr);
         test_error( pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE  ), "pthread_attr_setstacksize" );
@@ -555,14 +565,14 @@ check(const char* filename){
                               &thread_start, &mi), "pthread_create" );
         }
         test_error( pthread_attr_destroy(&attr), "pthread_attr_destroy" );
+    }else{
+        task_init( ptask );
     }
     //check-file line number
     ln = 1;
     //function call status code
     s = 0;
-    /*just initialized tasks queue has only free blocks.
-    Take last block for instance */
-    task_t*  ptask = &(mi.tasks[TASK_QUEUE_SIZE-1]);
+
     do{
         r = fread(buff, 1, sizeof(buff), f);
         if(r!=sizeof(buff) ){
@@ -704,6 +714,8 @@ check(const char* filename){
             }       
         }
         master_context_free(&mi);
+    }else{
+        task_free(ptask);
     }
     
     if(flag_verbose && ln>0 && res==S_ERR_FORMAT){
@@ -730,9 +742,9 @@ printusage(const char* executable){
             "The input for -c should be the list of message digests and file names\n"
             "that is printed on stdout by this program when it generates digests.\n", stderr);
     fputs("examples:\n  calculate\n", stderr);
-	fprintf(stderr,"\t%s -v filename [filename] ... > check.file\n  validate\n", executable);
+    fprintf(stderr,"\t%s -v filename [filename] ... > check.file\n  validate\n", executable);
     fprintf(stderr,"\t%s -c check.file\n", executable);
-	fputs("returns 0 on success, >0 on error \n", stderr);
+    fputs("returns 0 on success, >0 on error \n", stderr);
             
     return 1;
 }
