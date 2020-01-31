@@ -17,32 +17,38 @@
 #ifdef ENABLE_SIMD
 # if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
 #  define __GOST3411_HAS_SSE2__
-#  if !defined(__x86_64__)
-   /* x86-64 bit Linux and Windows ABIs provide malloc function that returns 16-byte alignment
-      memory buffers required by SSE load/store instructions. Other platforms require special trick  
-      for proper gost2012_hash_ctx structure allocation. It will be easier to switch to unaligned 
-      loadu/storeu memory access instructions in this case.
-   */  
-#   define UNALIGNED_MEM_ACCESS 
-#  endif   
 # endif
+#endif
+
+
+#if defined(__x86_64__)
+/* x86-64 bit Linux and Windows ABIs provide malloc function that returns 16-byte alignment
+  memory buffers required by SSE load/store instructions. Other platforms require special trick  
+  for proper gost2012_hash_ctx structure allocation. It will be easier to switch to unaligned 
+  loadu/storeu memory access instructions in this case.
+*/  
+# define UNALIGNED_MEM_ACCESS
+# define GOST_ALIGNED_MEMORY
+#else
+/*Assume other platforms not capable read unaligned memory
+  or this operations are not fast enough 
+*/ 
+#endif
+
+#ifdef __i386__
+# define UNALIGNED_MEM_ACCESS
 #endif
 
 #ifdef __GOST3411_HAS_SSE2__
 # if defined(__GNUC__) && ((__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 2))
 #  undef __GOST3411_HAS_SSE2__
 # endif
-#else
-# if !defined(__i386__) && !defined(__x86_64__)
- /*Assume other platforms are not capable unaligned memory read
-   or unaligned memory read is not fast enough 
- */ 
-#  define UNALIGNED_MEM_ACCESS
-# endif
 #endif
 
+
 #ifdef FORCE_UNALIGNED_MEM_ACCESS  
-# define UNALIGNED_MEM_ACCESS
+# undef GOST_ALIGNED_MEMORY
+# undef UNALIGNED_MEM_ACCESS
 #endif
 
 #ifndef L_ENDIAN

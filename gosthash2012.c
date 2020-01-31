@@ -183,16 +183,19 @@ static INLINE void stage3(gost2012_hash_ctx * CTX)
 void gost2012_hash_block(gost2012_hash_ctx * CTX,
                          const unsigned char * data, size_t len)
 {
-    register size_t chunksize;
-    register size_t bufsize = CTX->bufsize;
+    size_t chunksize;
+    size_t bufsize = CTX->bufsize;
     
     if(bufsize==0){
         while(len>=64){
+#ifdef __x86_64__
+            _mm_prefetch((const char*)data+64, _MM_HINT_T0);
+#endif
 #ifdef UNALIGNED_MEM_ACCESS
             stage2(CTX, (const union uint512_u *)data );
 #else
             memcpy(&CTX->buffer.B[0], data, 64);
-                stage2(CTX, &(CTX->buffer) );
+            stage2(CTX, &(CTX->buffer) );
 #endif
             len   -= 64;
             data  += 64;            
