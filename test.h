@@ -1,21 +1,23 @@
 #ifndef TEST_H
 #define TEST_H
 
+#define T(e) do{ if (!(e)) {\
+       ERR_print_errors_fp(stderr); OpenSSLDie(__FILE__, __LINE__, #e); \
+    } }while (0)
 
+#define TE(e) do{ if (!(e)) {\
+       ERR_print_errors_fp(stderr); \
+       fprintf(stderr, "Error at %s:%d %s\n", __FILE__, __LINE__, #e); \
+       return -1; \
+    } }while (0) 
 
-#define T(e) do{ if (!(e)) { ERR_print_errors_fp(stderr); OpenSSLDie(__FILE__, __LINE__, #e); } }while (0)
-
-#define TE(e) do{ if (!(e)) { \
-                ERR_print_errors_fp(stderr); \
-                fprintf(stderr, "Error at %s:%d %s\n", __FILE__, __LINE__, #e); \
-                return -1; } }while (0) 
-
-#define TEST_ASSERT(e) do{ test = (e);}while (0); if (test) \
-           printf(cRED "  Test FAILED\n" cNORM); \
-        else \
-           printf(cGREEN "  Test passed\n" cNORM)\
+#define TEST_ASSERT(e) do{ test = (e); \
+    if (test) \
+       printf(cRED "  Test FAILED\n" cNORM); \
+    else \
+       printf(cGREEN "  Test passed\n" cNORM)\
+    } while (0);
              
-
 #ifdef __GNUC__
 # define _UNUSED_ __attribute__ ((unused))
 #else
@@ -47,8 +49,6 @@ _UNUSED_ static void hexdump_inline(const void *ptr, size_t len)
     printf("\n");
 }
 
-
-
 #ifdef _WIN32
  #include <stdlib.h>
  static inline int setenv(const char* name, const char* value,int overwrite){
@@ -58,7 +58,4 @@ _UNUSED_ static void hexdump_inline(const void *ptr, size_t len)
  #include <unistd.h>
  #include <arpa/inet.h>
 #endif
-
 #endif       
-
-
