@@ -12,7 +12,6 @@
 # error "GOST R 34.11-2012: SSE2 not enabled"
 #endif
 
-
 #include <mmintrin.h>
 #include <emmintrin.h>
 
@@ -49,7 +48,7 @@
     xmm3 = UMEM_READ_I128(&__m128p[3]); \
 }
 
-#ifdef UNALIGNED_MEM_ACCESS
+#ifndef GOST_ALIGNED_MEMORY
 
 # define LOAD   ULOAD
 # define MEM_WRITE_I128  _mm_storeu_si128
