@@ -9,19 +9,19 @@
  */
 
 GOST_ALIGN(16)
-static const union uint512_u buffer0 = {
+static const uint512_t buffer0 = {
     {0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL}
 };
 
 #ifndef __GOST3411_BIG_ENDIAN__
 GOST_ALIGN(16)
-static const union uint512_u buffer512 = {
+static const uint512_t buffer512 = {
     {0x0000000000000200ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL,
      0x0ULL}
 };
 #else
 GOST_ALIGN(16)
-static const union uint512_u buffer512 = {
+static const uint512_t buffer512 = {
     {0x0002000000000000ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL, 0x0ULL,
      0x0ULL}
 };
@@ -29,7 +29,7 @@ static const union uint512_u buffer512 = {
 
 #ifndef __GOST3411_BIG_ENDIAN__
 GOST_ALIGN(16)
-static const union uint512_u C[12] = {
+static const uint512_t C[12] = {
     {{
       0xdd806559f2a64507ULL,
       0x05767436cc744d23ULL,
@@ -141,7 +141,7 @@ static const union uint512_u C[12] = {
 };
 #else
 GOST_ALIGN(16)
-static const union uint512_u C[12] = {
+static const uint512_t C[12] = {
     {{
       0x0745a6f2596580ddULL,
       0x234d74cc36747605ULL,

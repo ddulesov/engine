@@ -9,9 +9,10 @@
  */
 
 #include "gosthash2012.h"
+#include "cpu.h"
 #include <assert.h>
 
-#ifdef __x86_64__
+#ifdef IS_X86_64
 
 # include <immintrin.h>
 # ifdef __clang__
@@ -32,18 +33,21 @@
      ((x & 0x000000000000FF00ULL) << 40) | \
      ((x & 0x00000000000000FFULL) << 56))
 
-/*
- * Initialize gost2012 hash context structure
- */
-void init_gost2012_hash_ctx(gost2012_hash_ctx * CTX,
-                            const unsigned int digest_size)
-{
-    memset(CTX, 0, sizeof(gost2012_hash_ctx));
 
-    CTX->digest_size = digest_size;
-    if (digest_size == 256)
-        memset(&CTX->h, 0x01, sizeof(uint512_u));
-}
+typedef void (*g_t)(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
+              const union uint512_u * UNALIGNED RESTRICT m);
+
+#include "gosthash2012_ref.h"
+void g_ref(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
+              const union uint512_u * UNALIGNED RESTRICT m);
+
+#ifdef IS_X86
+#include "gosthash2012_sse2.h"
+void g_sse2(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
+              const union uint512_u * UNALIGNED RESTRICT m);
+
+#endif
+static g_t  g = &g_ref;
 
 static INLINE void pad(gost2012_hash_ctx * CTX)
 {    
@@ -56,7 +60,7 @@ static INLINE void pad(gost2012_hash_ctx * CTX)
 static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * UNALIGNED RESTRICT y)
 {
     
-#ifdef __x86_64__
+#ifdef IS_X86_64
     unsigned char CF=0;
     unsigned int i;
     
@@ -97,57 +101,6 @@ static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * 
 #endif
 }
 
-static void g(union uint512_u * RESTRICT h, const union uint512_u * RESTRICT N,
-              const union uint512_u * UNALIGNED RESTRICT m)
-{
-#ifdef __GOST3411_HAS_SSE2__
-    __m128i xmm0, xmm2, xmm4, xmm6; /* XMMR0-quadruple */
-    __m128i xmm1, xmm3, xmm5, xmm7; /* XMMR1-quadruple */
-    unsigned int i;
-
-    LOAD(N, xmm0, xmm2, xmm4, xmm6);
-    XLPS128M(h, xmm0, xmm2, xmm4, xmm6);
-    ULOAD(m, xmm1, xmm3, xmm5, xmm7);
-
-    XLPS128R(xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
-
-    for (i = 0; i < 11; i++)
-        ROUND128(i, xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
-
-    XLPS128M((&C[11]), xmm0, xmm2, xmm4, xmm6);
-    X128R(xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
-
-    X128M(h, xmm0, xmm2, xmm4, xmm6);
-    ULOAD(m, xmm1, xmm3, xmm5, xmm7);
-    X128R(xmm0, xmm2, xmm4, xmm6, xmm1, xmm3, xmm5, xmm7);
-
-    STORE(h, xmm0, xmm2, xmm4, xmm6);
-#if 0
-    /* Restore the Floating-point status on the CPU. Require only for MMX version */
-    _mm_empty();
-#endif    
-#else
-    union uint512_u Ki, data;
-    unsigned int i;
-
-    XLPS(h, N, (&data));
-
-    /* Starting E() */
-    Ki = data;
-    XLPS((&Ki), ((const union uint512_u *)&m[0]), (&data));
-
-    for (i = 0; i < 11; i++)
-        ROUND(i, (&Ki), (&data));
-
-    XLPS((&Ki), (&C[11]), (&Ki));
-    X((&Ki), (&data), (&data));
-    /* E() done */
-
-    X((&data), h, (&data));
-    X((&data), m, h);
-#endif
-}
-
 static INLINE void stage2(gost2012_hash_ctx * CTX, const union uint512_u * UNALIGNED data)
 {
     g(&(CTX->h), &(CTX->N), data );
@@ -164,7 +117,7 @@ static INLINE void stage3(gost2012_hash_ctx * CTX)
 
     add512(&(CTX->Sigma), &(CTX->buffer));
 
-    memset(&(CTX->buffer.B[0]), 0x00, sizeof(uint512_u) );  
+    memset(&(CTX->buffer.B[0]), 0x00, sizeof(uint512_t) );  
 #ifndef __GOST3411_BIG_ENDIAN__
     CTX->buffer.QWORD[0] = CTX->bufsize << 3;
 #else
@@ -174,6 +127,27 @@ static INLINE void stage3(gost2012_hash_ctx * CTX)
     add512(&(CTX->N), &(CTX->buffer));
     g(&(CTX->h), &buffer0, &(CTX->N));
     g(&(CTX->h), &buffer0, &(CTX->Sigma));
+}
+
+/*
+ * Initialize gost2012 hash context structure
+ */
+void init_gost2012_hash_ctx(gost2012_hash_ctx * CTX,
+                            const unsigned int digest_size)
+{
+    memset(CTX, 0, sizeof(gost2012_hash_ctx));
+
+    
+#ifdef IS_X86
+    const enum cpu_feature features = get_cpu_features();
+    if (features & SSE2) {
+        g = &g_sse2;
+    }
+#endif
+
+    CTX->digest_size = digest_size;
+    if (digest_size == 256)
+        memset(&CTX->h, 0x01, sizeof(uint512_t));
 }
 
 /*
@@ -188,7 +162,7 @@ void gost2012_hash_block(gost2012_hash_ctx * CTX,
     
     if(bufsize==0){
         while(len>=64){
-#ifdef __x86_64__
+#ifdef IS_X86
             _mm_prefetch((const char*)data+64, _MM_HINT_T0);
 #endif
 #ifdef UNALIGNED_MEM_ACCESS

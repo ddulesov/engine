@@ -7,22 +7,14 @@
  * Author: Alexey Degtyarev <alexey@renatasystems.org>
  *
  */
-
-#ifndef __GOST3411_HAS_SSE2__
-# error "GOST R 34.11-2012: SSE2 not enabled"
-#endif
-
+#include "cpu.h"
 #include <mmintrin.h>
 #include <emmintrin.h>
-
-#ifdef __SSE3__
-#include <pmmintrin.h>
-#endif
 
 #define LO(v) ((unsigned char) (v))
 #define HI(v) ((unsigned char) (((unsigned int) (v)) >> 8))
 
-#ifdef __i386__
+#ifdef IS_X86_32
 # define EXTRACT EXTRACT32
 #else
 # define EXTRACT EXTRACT64
@@ -33,11 +25,15 @@
 # define _mm_cvtm64_si64(v) (long long) v
 #endif
 
+#if 0
 # ifdef __SSE3__
 #   define UMEM_READ_I128 _mm_lddqu_si128  
 # else 
 #   define UMEM_READ_I128 _mm_loadu_si128
 # endif 
+#endif
+
+#define UMEM_READ_I128 _mm_loadu_si128
 
 /* load 512bit from unaligned memory  */
 #define ULOAD(P, xmm0, xmm1, xmm2, xmm3) { \
@@ -48,7 +44,7 @@
     xmm3 = UMEM_READ_I128(&__m128p[3]); \
 }
 
-#ifndef GOST_ALIGNED_MEMORY
+#ifndef IS_X86_64
 
 # define LOAD   ULOAD
 # define MEM_WRITE_I128  _mm_storeu_si128

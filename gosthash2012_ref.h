@@ -8,9 +8,6 @@
  *
  */
 
-#ifdef __GOST3411_HAS_SSE2__
-# error "GOST R 34.11-2012: portable implementation disabled in config.h"
-#endif
 
 #define X(x, y, z) { \
     z->QWORD[0] = x->QWORD[0] ^ y->QWORD[0]; \

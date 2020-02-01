@@ -31,25 +31,18 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
     add_compile_options(/MP /WX /W4 /wd4100 /wd4267 /wd4706)
 endif()
 
-cmake_host_system_information(RESULT  CPU_HAS_SSE2 QUERY HAS_SSE2)
-
-if(CPU_HAS_SSE2 AND NOT NO_SIMD)
-    message("build SSE2 optimized library. Provide NO_SIMD parameter to turn SSE off")
-    add_definitions(-DENABLE_SIMD)
-    if(CMAKE_C_COMPILER_ID MATCHES "GNU|ICC|Clang")
-        #ensure compiler turn SIMD flags and intrinsics on
-        add_compile_options(-march=native)
-    elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-        message("to turn on SSE2/AVX optimization on Windows uncomment appropriate option line!")
-        #MSVC require further survey of system capabilities  (SSE4.1,AVX)
-        #but current version of CMAKE (3.16) lack of such feature
-        #uncomment one of the next line to build GOST Engine boosted by SSE/AVX 
-  
-        #add_compile_options(/arch:AVX512)
-        add_compile_options(/arch:AVX2)
-        #add_compile_options(/arch:AVX)
-        #add_compile_options(/arch:SSE2)  
-    endif()
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|ICC|Clang")
+	#ensure compiler turn SIMD flags and intrinsics on
+elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+	message("to turn on SSE2/AVX optimization on Windows uncomment appropriate option line!")
+	#MSVC require further survey of system capabilities  (SSE4.1,AVX)
+	#but current version of CMAKE (3.16) lack of such feature
+	#uncomment one of the next line to build GOST Engine boosted by SSE/AVX 
+	
+	#add_compile_options(/arch:AVX512)
+	add_compile_options(/arch:AVX2)
+	#add_compile_options(/arch:AVX)
+	#add_compile_options(/arch:SSE2)  
 endif()
 
 if(ASAN)
@@ -57,7 +50,7 @@ if(ASAN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -g3 -fno-omit-frame-pointer")
 endif()
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 99)
 CHECK_FUNCTION_EXISTS(clock_gettime HAVE_CLOCK_GETTIME_C)
 CHECK_LIBRARY_EXISTS(rt clock_gettime "" HAVE_CLOCK_GETTIME_RT)
 
@@ -90,7 +83,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
 # Remove when https://gitlab.kitware.com/cmake/cmake/issues/18525 is addressed
 set(OPENSSL_ENGINES_DIR "" CACHE PATH "OpenSSL Engines Directory")
 if ("${OPENSSL_ENGINES_DIR}" STREQUAL "")
-    include(FindPkgConfig)
+
     pkg_get_variable(OPENSSL_ENGINES_DIR libcrypto enginesdir)
     if ("${OPENSSL_ENGINES_DIR}" STREQUAL "")
         message( FATAL_ERROR "Unable to discover the OpenSSL engines directory. Provide the path using -DOPENSSL_ENGINES_DIR" )
@@ -99,46 +92,35 @@ endif()
 
 set(GOST_89_SOURCE_FILES
     gost89.c
-    gost89.h
 )
 
 set(GOST_HASH_SOURCE_FILES
     gosthash.c
-    gosthash.h
 )
 
 set(GOST_HASH_2012_SOURCE_FILES
+	cpu.c
+	cpu.h
     gosthash2012.c
-    gosthash2012.h
-    gosthash2012_const.h
-    gosthash2012_precalc.h
-    gosthash2012_ref.h
-    gosthash2012_sse2.h
+	gosthash2012_ref.c
+	gosthash2012_sse2.c
 )
 
 set(GOST_GRASSHOPPER_SOURCE_FILES
-    gost_grasshopper.h
-    gost_grasshopper_core.h
     gost_grasshopper_core.c
-    gost_grasshopper_defines.h
     gost_grasshopper_defines.c
-    gost_grasshopper_math.h
     gost_grasshopper_galois_precompiled.c
     gost_grasshopper_precompiled.c
-    gost_grasshopper_cipher.h
     gost_grasshopper_cipher.c
 )
 
 set(GOST_CORE_SOURCE_FILES
     e_gost_err.c
-    e_gost_err.h
     gost_asn1.c
     gost_crypt.c
     gost_ctl.c
     gost_eng.c
     gost_keywrap.c
-    gost_keywrap.h
-    gost_lcl.h
     gost_params.c
     gost_keyexpimp.c
 )
@@ -173,6 +155,12 @@ set(GOST_ENGINE_SOURCE_FILES
     gost_omac_acpkm.c
 )
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|x86")
+    message("sse2 optimized")
+	if(NOT MSVC)
+	    set_source_files_properties(gosthash2012_sse2.c PROPERTIES COMPILE_FLAGS -msse2)
+	endif()
+endif()
 
 
 #core library
@@ -214,7 +202,6 @@ add_test(NAME sign/verify
 )
 
 if(NOT MSVC)
-
     add_executable(test_tls test_tls.c ansi_terminal.c)
     target_link_libraries(test_tls gost_engine gost_core ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
     add_test(NAME TLS
@@ -301,15 +288,16 @@ target_link_libraries(gostsum gost_core)
 
 set(GOST_12_SUM_SOURCE_FILES
     gost12sum.c
+	${GOST_HASH_2012_SOURCE_FILES}
     ansi_terminal.c
-    gosthash2012.c
+  
 )
 add_executable(gost12sum ${GOST_12_SUM_SOURCE_FILES})
 
 if(NOT MSVC)
     set(GOST_1_SUM_SOURCE_FILES
         tools/gostsum1.c
-        gosthash2012.c
+        ${GOST_HASH_2012_SOURCE_FILES}
         gosthash.c
         gost89.c
     )

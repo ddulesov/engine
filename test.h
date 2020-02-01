@@ -15,7 +15,7 @@
     if (test) \
        printf(cRED "  Test FAILED\n" cNORM); \
     else \
-       printf(cGREEN "  Test passed\n" cNORM)\
+       printf(cGREEN "  Test passed\n" cNORM);\
     } while (0);
              
 #ifdef __GNUC__
