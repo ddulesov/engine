@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 project(gost-engine LANGUAGES C)
 
 include(GNUInstallDirs)
@@ -31,14 +31,14 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
     add_compile_options(/MP /WX /W4 /wd4100 /wd4267 /wd4706)
 endif()
 
-cmake_host_system_information(RESULT  CPU_HAS_SSE2 QUERY HAS_SSE2)
-
-if(CPU_HAS_SSE2 AND NOT NO_SIMD)
-    message("build SSE2 optimized library. Provide NO_SIMD parameter to turn SSE off")
-    add_definitions(-DENABLE_SIMD)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|x86")
+    if(NOT NO_SIMD)
+        message("build SSE2 optimized library. Provide NO_SIMD parameter to turn SSE off")
+        add_definitions(-DOPENSSL_IA32_SSE2)
+	endif()
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|ICC|Clang")
         #ensure compiler turn SIMD flags and intrinsics on
-        add_compile_options(-march=native)
+        #add_compile_options(-msse2)
     elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
         message("to turn on SSE2/AVX optimization on Windows uncomment appropriate option line!")
         #MSVC require further survey of system capabilities  (SSE4.1,AVX)
@@ -46,7 +46,7 @@ if(CPU_HAS_SSE2 AND NOT NO_SIMD)
         #uncomment one of the next line to build GOST Engine boosted by SSE/AVX 
   
         #add_compile_options(/arch:AVX512)
-        add_compile_options(/arch:AVX2)
+        #add_compile_options(/arch:AVX2)
         #add_compile_options(/arch:AVX)
         #add_compile_options(/arch:SSE2)  
     endif()

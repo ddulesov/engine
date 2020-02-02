@@ -10,33 +10,35 @@
 
 #include <string.h>
 
-#if defined(_M_AMD64) || defined(_M_X64)
+#if !defined(__x86_64__) && defined(_M_X64) 
 # define __x86_64__
 #endif
 
-#ifdef ENABLE_SIMD
-# if defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+#if !defined(__i386__) && defined(_M_IX86)
+# define __i386__
+#endif
+
+#ifdef OPENSSL_IA32_SSE2
+# if defined(__SSE2__) || defined(_M_X64) 
 #  define __GOST3411_HAS_SSE2__
 # endif
 #endif
 
-
-#if defined(__x86_64__)
+#ifdef __x86_64__
+# define UNALIGNED_MEM_ACCESS
 /* x86-64 bit Linux and Windows ABIs provide malloc function that returns 16-byte alignment
   memory buffers required by SSE load/store instructions. Other platforms require special trick  
   for proper gost2012_hash_ctx structure allocation. It will be easier to switch to unaligned 
   loadu/storeu memory access instructions in this case.
 */  
-# define UNALIGNED_MEM_ACCESS
 # define GOST_ALIGNED_MEMORY
 #else
-/*Assume other platforms not capable read unaligned memory
-  or this operations are not fast enough 
-*/ 
-#endif
-
 #ifdef __i386__
 # define UNALIGNED_MEM_ACCESS
+#endif
+/*Assume other platforms not capable read/write unaligned memory
+  or this operations are not fast enough 
+*/ 
 #endif
 
 #ifdef __GOST3411_HAS_SSE2__
@@ -44,7 +46,6 @@
 #  undef __GOST3411_HAS_SSE2__
 # endif
 #endif
-
 
 #ifdef FORCE_UNALIGNED_MEM_ACCESS  
 # undef GOST_ALIGNED_MEMORY
@@ -63,11 +64,7 @@
 
 #if defined(_WIN32) || defined(_WINDOWS)
 # define INLINE __inline
-# ifdef __x86_64__
-#  define UNALIGNED __unaligned
-# else
-#  define UNALIGNED
-# endif 
+# define UNALIGNED __unaligned 
 #else
 # define INLINE inline
 # define UNALIGNED 
