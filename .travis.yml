@@ -1,4 +1,4 @@
-dist: bionic
+dist: trusty
 os: linux
 language: c
 
@@ -9,6 +9,10 @@ env:
     - LD_LIBRARY_PATH=${PREFIX}/lib:$LD_LIBRARY_PATH
     - OPENSSL_BRANCH=OpenSSL_1_1_1-stable
 
+addons:
+  apt:
+    update: true
+    
 matrix:
   include:
     - name: linux/gcc/x86_64
@@ -50,6 +54,9 @@ matrix:
       os: osx
       compiler: clang
 
+before_install:
+  - if [ $TRAVIS_OS_NAME = 'linux' ]; then sudo apt-get -y install cmake;  fi
+  
 before_script:
   - curl -L https://cpanmin.us | sudo perl - --sudo App::cpanminus
   - sudo cpanm --notest Test2::V0 > build.log 2>&1 || (cat build.log && exit 1)
