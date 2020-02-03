@@ -307,20 +307,24 @@ set(GOST_12_SUM_SOURCE_FILES
 add_executable(gost12sum ${GOST_12_SUM_SOURCE_FILES})
 
 if(NOT MSVC)
-    set(GOST_1_SUM_SOURCE_FILES
-        tools/gostsum1.c
-        gosthash2012.c
-        gosthash.c
-        gost89.c
-    )
-    add_executable(gost1sum ${GOST_1_SUM_SOURCE_FILES})
+
+	if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 5.0)
+	    set(GOST_1_SUM_SOURCE_FILES
+			tools/gostsum1.c
+			gosthash2012.c
+			gosthash.c
+			gost89.c
+		)
+        add_executable(gost1sum ${GOST_1_SUM_SOURCE_FILES})
+		target_link_libraries(gost1sum pthread)
+	endif()
     if(TSAN)
         message(STATUS "thread sanitizer enabled")
         target_compile_options(gost1sum PRIVATE "-fsanitize=thread;-g3")
         target_link_libraries(gost1sum  "-fsanitize=thread")
     endif()
 
-    target_link_libraries(gost1sum pthread)
+    
 endif()
 
 #benchmarks
