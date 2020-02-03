@@ -12,7 +12,6 @@
 #include <assert.h>
 
 #ifdef __x86_64__
-
 # include <immintrin.h>
 # ifdef __clang__
 # elif __GNUC__
@@ -56,7 +55,7 @@ static INLINE void pad(gost2012_hash_ctx * CTX)
 static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * UNALIGNED RESTRICT y)
 {
     
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(BUILTIN_ADDCARRY_U64_EXIST)
     unsigned char CF=0;
     unsigned int i;
     
@@ -74,7 +73,6 @@ static INLINE void add512(union uint512_u * RESTRICT x, const union uint512_u * 
     xp = (unsigned char *)&x[0];
     yp = (const unsigned char *)&y[0];
     
-
     buf = 0;
     for (i = 0; i < 64; i++) {
         buf = xp[i] + yp[i] + (buf >> 8);

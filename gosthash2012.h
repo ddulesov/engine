@@ -14,6 +14,14 @@
 # define __x86_64__
 #endif
 
+#if defined(__GNUC__) && (__GNUC__ > 6)
+# define BUILTIN_ADDCARRY_U64_EXIST
+#endif
+
+#if defined(_MSC_VER) && (_MSC_VER > 1900 )
+# define BUILTIN_ADDCARRY_U64_EXIST
+#endif
+
 #if !defined(__i386__) && defined(_M_IX86)
 # define __i386__
 #endif
